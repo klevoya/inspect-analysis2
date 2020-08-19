@@ -1,0 +1,290 @@
+/*
+ *  Copyright 2020 Barracuda Systems Ltd
+ *  Copyright 2018 Secure, Reliable, and Intelligent Systems Lab, ETH Zurich
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  This file has been modified by Barracuda Systems Ltd to add support for WebAssembly and EOSIO blockchains.
+ *
+ */
+
+
+/*
+ * MayAnalysis
+ * Design objectives:
+ * - Calculate Var may point-to relations. As this is a may analysis it over-approximates
+ * - Use decompiled inputs for taints, function calls and returns
+ * - Propagate Var points-to based on instruction flow (may see later if need to make this stricter by stopping
+ * propagation everytime there is an assignment to a variable. Strangely Securify does this for storage and mem)
+ * - Have exception flowing in the same manner as Var points-to
+ */
+
+.comp MayImplicitAnalysis {
+    //
+    // Derived
+    //
+    /*
+    .decl reassignMemory	(l:Label, v:Var)
+    .decl reassignDatabase	(l:Label, v:Var)
+    .decl removeDatabase	(l:Label, v:Var)
+    */
+    .decl mstoreOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
+    .decl mloadOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
+    .decl memcpyOffsetsPropagtd (l: Label, destOffset:Var, srcOffset:Var)
+
+    //
+    // Outputs
+    //
+    .decl flowsToVar        (l: Label, v: Var, f: VarFact)
+    .decl flowsToVarInter   (l: Label, v: Var, f: VarFact)
+    .decl flowsToMem        (l: Label, dynOffset: Var, memargOffset: Var, f:VarFact)
+    .decl database          (itr: Var, payer:Var, f: VarFact)
+    .decl functionAssign    (l: Label, v1: Var, v2: Var)
+    .decl isAfter           (l1: Label, l2: Label)
+    .decl taintPropagated   (l1: Label, l2: Label, cond: Var)
+    .decl flowsToVarBetwFunctions(callerSite: Label, funcLabel: Label, varInFuncDefinition: Var, fact: VarFact)
+
+    // Declare outputs
+    .output flowsToVar
+    .output flowsToMem
+    .output database
+    .output isAfter
+    .output functionAssign
+    .output flowsToVarBetwFunctions
+
+    .output taintPropagated
+
+    //
+    // Control flow rules
+    //
+#ifdef MAY_CONTROL_FLOW
+    // Below is higher granularity, but leads to combinatorial explosion. Try to limit to functions of interest
+    isAfter(LabFrom, LabTo) :- mayfollows(LabFrom, LabTo).
+
+    isAfter(LabFrom, LabTo) :- isAfter(LabFrom, Lab),
+                               mayfollows(Lab, LabTo).
+
+    // If the instruction at LabTo follows an instruction at LabThenElse, and
+    // If there is a branch statement at LabIf that branches to LabThenElse, based on condition Var, and
+    // If LabIf and LabTo do not correspond to the end of the branch statement,
+    // Then it is inferred that condition Var taints the instruction at LabTo.
+    taintPropagated(LabIf, LabThenOrElse, Var) :- taint(LabIf, LabThenOrElse, Var).
+    taintPropagated(LabIf, LabTo, Var) :- isAfter(LabThenOrElse, LabTo),
+                                          taint(LabIf, LabThenOrElse, Var),
+                                          endIf(LabIf, LabEnd),
+                                          !isAfter(LabEnd, LabTo).
+#endif
+
+    /*---
+     Information Flow
+    ---*/
+    // Convert each assignment into context-free dataflow rules
+    flowsToVar(Lab, Var, Fact) :- assignVar(Lab, Var, Fact).
+    flowsToVar(Lab, Var, Fact) :- assignType(Lab, Var, Fact).
+    flowsToVar(Lab, Var, Fact) :- throw(Lab, Fact, Var).
+
+    flowsToVar(Lab, VarDest, VarSrc) :-
+        functionAssign(Lab, VarDest, VarSrc).
+
+    /* Propagate info flow recursively for all info flows intra-function.
+     * Contrary to MustExplicitAnalysis here we consider ANY VarFactSrc regardless of control flow
+     * (Alternatively we may also want to think about using isAfter as that has May Control Flow)
+     */
+    flowsToVar(LabDest, VarDest, VarFactSrc) :-
+        (
+            assignVar(LabDest, VarDest, Var);
+            functionAssign(LabDest, VarDest, Var)
+        ),
+        flowsToVar(LabSrc, Var, VarFactSrc),
+        fnInstr(inSameFunc, LabSrc),        // Stop propagation outside of one function (this will be handled by interfn calls)
+        fnInstr(inSameFunc, LabDest).
+
+    /* Facts flow between another in two ways.
+     * 1. Within a function inputs to a fn call flow to the output of that fn call.
+     * 2. Between functions, information flows from the function call to its definition. Below is an intermediate
+     *    relation that implements part of the inter-function information flows.
+     *  TODO: Look at combining both Inter and Intra information flows.
+     */
+    flowsToVarInter(Lab, VarDest, VarSrc) :-
+        flowsToVar(Lab, VarDest, VarSrc).
+
+    /* Propagation. If a FactSrc flows to variable, Var, at any location, and
+     *  If Var is assigned to a function definition variable, VarDest, at location, Lab,
+     *  THEN infer that FactSrc flows to VarDest at location Lab. */
+    flowsToVarInter(Lab, VarDest, FactSrc) :-
+        flowsToVarInter(Lab, VarDest, Var),
+        flowsToVar(_, Var, FactSrc).
+
+#ifdef MAY_CONTROL_FLOW
+
+    // Propagate tainted condition facts to any instruction in a branch that has a type assignment:
+    //  If Var1 has Any type assigned to it at a given label Lab, and
+    //  If Var2 taints the instruction at the label Lab (regardless of the original branching instruction), and
+    //  If Fact reaches Var2,
+    //  Then infer that Fact reaches Var1.
+    // N.B. If change this to be instr context senstivie then could maybe just have one rule taint(_,Lab, Var2), flowsToVar(Lab,Var2,Fact)?
+    flowsToVar(Lab, Var1, Fact) :- assignType(Lab, Var1, _),
+                                   taintPropagated(_, Lab, Var2),
+                                   flowsToVar(Lab, Var2, Fact).
+
+    // Similarly propagate tainted condition variables to any instruction in a branch that has a variable assignment.
+    // Big difference to above is that if Var2 has no Fact, Var1 is still tainted by Var2
+    flowsToVar(Lab, Var1, Var2) :- assignVar(Lab, Var1, _),
+                                   taintPropagated(_, Lab, Var2).
+#endif
+
+    //
+    // Inter function CallGraph rules
+    //
+
+    functionAssign(Lab, VarTo, VarFrom) :- fnDefinitionArgument(_, FnName, ArgIndex, VarTo),
+                                           (VarTo != "null"),
+                                           fnCallArgument(Lab, FnName, ArgIndex, VarFrom).
+
+    functionAssign(Lab, VarTo, VarFrom) :- fnDefinitionRtn(_, FnName, VarFrom),
+                                           fnCallRtn(Lab, FnName, VarTo).
+
+    /* Propagate facts between functions. This works out function call graph on the fly (based on dataflow between
+     * function callers and function definitions) when propagating dataflow between functions */
+    flowsToVarBetwFunctions(callerSite, labelInFunc, varDestInFunc, varFactCaller) :-
+        fnCall(callerSite, _, calledFunc),
+        fnInstr(calledFunc, labelInFunc),
+        flowsToVarInter(callerSite, varInFuncDefinition, varFactCaller),
+        flowsToVarInter(labelInFunc, varDestInFunc, varInFuncDefinition).
+
+    // Add internal flows???
+    /* flowsToVarBetwFunctions(callerSite, labelInFunc, varDestInFunc, varFactSrcInFunc) :-
+        flowsToVarBetwFunctions(callerSite,labelInFunc,_,_),
+        flowsToVar(labelInFunc, varDestInFunc, varFactSrcInFunc). */
+
+    /**
+     * Memory and EOS RAM (i.e. database) rules
+     * As this May analysis we assume a very broad applicability of mem/db access across instructions.
+    **/
+    // The two offsets may have different values depending on how variables propagate to them.
+    // Work out all possible combinations.
+    mloadOffsetsPropagtd(LabMem, DynOffsetSrc, MemargOffset, Fact) :-
+        mload(LabMem, DynOffset, MemargOffset, Fact),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(Lab, LabMem),
+    #endif
+        flowsToVar(Lab, DynOffset, DynOffsetSrc).
+
+    mloadOffsetsPropagtd(LabMem, DynOffset, MemargOffsetSrc, Fact) :-
+        mload(LabMem, DynOffset, MemargOffset, Fact),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(Lab, LabMem),
+    #endif
+        flowsToVar(Lab, MemargOffset, MemargOffsetSrc).
+
+    mstoreOffsetsPropagtd(LabMem, DynOffsetSrc, MemargOffset, Fact) :-
+        mstore(LabMem, DynOffset, MemargOffset, Fact),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(Lab, LabMem),
+    #endif
+        flowsToVar(Lab, DynOffset, DynOffsetSrc).
+
+    mstoreOffsetsPropagtd(LabMem, DynOffset, MemargOffsetSrc, Fact) :-
+        mstore(LabMem, DynOffset, MemargOffset, Fact),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(Lab, LabMem),
+    #endif
+        flowsToVar(Lab, MemargOffset, MemargOffsetSrc).
+
+    memcpyOffsetsPropagtd(LabMem, DestOffsetPropgtd, SrcOffset) :-
+        memcpy(LabMem, DestOffset, SrcOffset),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(Lab, LabMem),
+    #endif
+        flowsToVar(Lab, DestOffset, DestOffsetPropgtd).
+
+    memcpyOffsetsPropagtd(LabMem, DestOffset, SrcOffsetPropgtd) :-
+        memcpy(LabMem, DestOffset, SrcOffset),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(Lab, LabMem),
+    #endif
+        flowsToVar(Lab, SrcOffset, SrcOffsetPropgtd).
+
+    flowsToMem(Lab, DynOffset, MemargOffset, Var) :-
+        mstoreOffsetsPropagtd(Lab, DynOffset, MemargOffset, Var).
+
+    /* Propagate facts to memory effective addresses (dynamic offset + memarg.offest).
+     * For May analysis we over-approximate by including all possible info flows regardless of control path taken.
+     *
+     *  If have stored a variable, Var, at memory offset, Offset, and
+     *  If type Type reaches that Var,
+     *  Then, infer that Fact reaches that memory location Offset.
+     */
+    flowsToMem(Lab, DynOffset, MemargOffset, Fact) :-
+        mstoreOffsetsPropagtd(Lab, DynOffset, MemargOffset, Var),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(LabFlow, Lab),
+        flowsToVar(LabFlow, Var, Fact).
+    #else
+        flowsToVar(_, Var, Fact).
+    #endif
+
+    /* Propagate Facts for memory reads.
+     * Loading contents from memory address [DynOffset, MemargOffset] into Var, and
+     * If a VarFact flowed into the same address, then VarFact flows through that memory into Var.
+     */
+    flowsToVar(Lab, Var, VarFact) :-
+        mloadOffsetsPropagtd(Lab, DynOffset, MemargOffset, Var),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(LabFlow, Lab),
+        flowsToMem(LabFlow, DynOffset, MemargOffset, VarFact).
+    #else
+        flowsToMem(_, DynOffset, MemargOffset, VarFact).
+    #endif
+
+    /* Propagate for memcpy */
+    flowsToMem(Lab, DestOffset, MemargOffset, Fact) :-
+        memcpyOffsetsPropagtd(Lab, DestOffset, SrcOffset),
+    #ifdef MAY_CONTROL_FLOW
+        isAfter(LabFlow, Lab),
+        flowsToMem(LabFlow, SrcOffset, MemargOffset, Fact).
+    #else
+        flowsToMem(_, SrcOffset, MemargOffset, Fact).
+    #endif
+
+
+    //  If at instruction Lab, load memory at offset Offset with Variable Var, and
+    //  If, memory at the same instruction Lab and same offset Offset has a Type, and
+    //  If, the offset is not unkown,
+    //  Then infer that the Var at instruction Labd has a type Type.
+    /* assignType(Lab, Var, Type) :- mload(Lab, DynOffset, MemargOffset, Var),
+                                  memory(Lab, DynOffset, MemargOffset, Type). */
+
+
+    // For dB load/stores similar logic as for memory.
+    database(Itr, Payer, Type) :- dbstore(Lab, Itr, Payer, _, Var),
+                                  flowsToVar(Lab, Var, Type).
+
+    /* TODO: For MayAnalysis this doesn't really make sense?
+    database(Itr, Type) :- isAfter(_, LabTo),
+                           database(Itr, Type),
+                           !reassignDatabase(LabTo, Itr),
+                           !removeDatabase(LabTo, Itr).
+
+    reassignDatabase(Lab, Itr) :- dbstore(Lab, Itr,_, _),
+                                  !unk(Itr).
+
+    reassignDatabase(Lab, Itr) :- dbupdate(Lab, Itr, _).
+
+    removeDatabase(Lab, Itr) :- dbremove(Lab, Itr).
+    */
+    // Propagate Types for EOS RAM reads
+    assignType(Lab, Var, Type) :- dbget(Lab, Var, Itr),
+                                  database(Itr, _, Type),
+                                  !unk(Itr).
+}

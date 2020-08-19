@@ -1,0 +1,130 @@
+18:57:34 [Main.main:149] INFO  Reading input file: binaries/wasm/analysis/ImproperAccessControl/simple_no_auth_check.wasm
+--- 
+18:57:35 [Main.decompileContract:187] INFO  Decompiling WASM... 
+18:57:35 [Decompiler.decompile:68] DEBUG Decompiling... 
+18:57:35 [Destacker.destack:173] DEBUG Destacking instructions in function: Func(params=[I32, I64], ret=null) 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:33] DEBUG ---- 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	db_store_i64(a{}{?}, b{}{?}, c{}{?}, d{}{?}, e{}{?}, f{}{?}) 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	db_store_i64_return (g{}{?}) 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:33] DEBUG ---- 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	require_auth(h{}{?}) 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	require_auth_return () 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:33] DEBUG ---- 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	simple_no_auth_check(i{}{?}, j{}{?}) 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 00:  	k{}{?} = i{}{?} (get_local[0]) 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 01:  	l{}{?} = 1.0 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 02:  	m{}{?} = k{}{?} + l{}{?} 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 03:  	drop m{}{?} 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 04:  	n{}{?} = -2.4010530888762168E18 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 05:  	o{}{?} = -3.0203716356402053E18 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 06:  	p{}{?} = j{}{?} (get_local[1]) 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 07:  	q{}{?} = -2.4010530888762655E18 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 08:  	r{}{?} = 100.0 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 09:  	s{}{?} = 200.0 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 0A:  	(t{}{?}) = db_store_i64(n{}{?}, o{}{?}, p{}{?}, q{}{?}, r{}{?}, s{}{?}) [t{}{?} = dbStore(scope: ?, table: ?, payer: ?, id: ?)] 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 0B:  	u{}{?} = i{}{?} (get_local[0]) 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 0C:  	v{}{?} = t{}{?} - u{}{?} 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 0D:  	drop v{}{?} 
+18:57:35 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	simple_no_auth_check_return () 
+18:57:35 [Decompiler.decompile:75] DEBUG Remove unused instructions (noop'd (dup, swap, pop))... 
+18:57:35 [Decompiler.decompile:85] DEBUG Creating dependency graph. 
+18:57:35 [Main.decompileContract:191] INFO  
+---
+Raw Decompile
+---- 
+18:57:35 [Main.decompileContract:198] INFO  Propagating constants... 
+18:57:35 [Main.decompileContract:204] INFO  Calculating merge instructions... 
+18:57:35 [Main.main:156] INFO    Verifying patterns... 
+18:57:35 [Main.checkPatterns:221] INFO  Computing global dataflow fixpoint over the entire contract... 
+18:57:35 [Dataflow.<init>:45] ERROR Could not create temporary directory 
+18:57:35 [AbstractDataflow.initDataflow:193] DEBUG 
+ 
+18:57:35 [AbstractDataflow.initDataflow:194] DEBUG Dataflow Analysis for must 
+18:57:35 [AbstractDataflow.initDataflow:198] ERROR Could not create temporary directory 
+18:57:35 [Main.handleInspectError:108] ERROR decompilation_error java.lang.RuntimeException
+	at com.klevoya.inspect.analysis.Dataflow.<init>(Dataflow.java:55)
+	at com.klevoya.inspect.Main.checkPatterns(Main.java:222)
+	at com.klevoya.inspect.Main.main(Main.java:157)
+
+18:57:35 [Main.main:164] ERROR pattern_error java.lang.RuntimeException
+	at com.klevoya.inspect.analysis.Dataflow.<init>(Dataflow.java:55)
+	at com.klevoya.inspect.Main.checkPatterns(Main.java:222)
+	at com.klevoya.inspect.Main.main(Main.java:157)
+
+18:58:10 [Main.main:149] INFO  Reading input file: binaries/wasm/analysis/ImproperAccessControl/simple_no_auth_check.wasm
+--- 
+18:58:11 [Main.decompileContract:187] INFO  Decompiling WASM... 
+18:58:11 [Decompiler.decompile:68] DEBUG Decompiling... 
+18:58:11 [Destacker.destack:173] DEBUG Destacking instructions in function: Func(params=[I32, I64], ret=null) 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:33] DEBUG ---- 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	db_store_i64(a{}{?}, b{}{?}, c{}{?}, d{}{?}, e{}{?}, f{}{?}) 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	db_store_i64_return (g{}{?}) 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:33] DEBUG ---- 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	require_auth(h{}{?}) 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	require_auth_return () 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:33] DEBUG ---- 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	simple_no_auth_check(i{}{?}, j{}{?}) 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 00:  	k{}{?} = i{}{?} (get_local[0]) 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 01:  	l{}{?} = 1.0 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 02:  	m{}{?} = k{}{?} + l{}{?} 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 03:  	drop m{}{?} 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 04:  	n{}{?} = -2.4010530888762168E18 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 05:  	o{}{?} = -3.0203716356402053E18 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 06:  	p{}{?} = j{}{?} (get_local[1]) 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 07:  	q{}{?} = -2.4010530888762655E18 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 08:  	r{}{?} = 100.0 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 09:  	s{}{?} = 200.0 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 0A:  	(t{}{?}) = db_store_i64(n{}{?}, o{}{?}, p{}{?}, q{}{?}, r{}{?}, s{}{?}) [t{}{?} = dbStore(scope: ?, table: ?, payer: ?, id: ?)] 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 0B:  	u{}{?} = i{}{?} (get_local[0]) 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 0C:  	v{}{?} = t{}{?} - u{}{?} 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG 0D:  	drop v{}{?} 
+18:58:11 [DecompilationPrinter.lambda$printInstructions$0:37] DEBUG ...  	simple_no_auth_check_return () 
+18:58:11 [Decompiler.decompile:75] DEBUG Remove unused instructions (noop'd (dup, swap, pop))... 
+18:58:11 [Decompiler.decompile:85] DEBUG Creating dependency graph. 
+18:58:11 [Main.decompileContract:191] INFO  
+---
+Raw Decompile
+---- 
+18:58:11 [Main.decompileContract:198] INFO  Propagating constants... 
+18:58:11 [Main.decompileContract:204] INFO  Calculating merge instructions... 
+18:58:11 [Main.main:156] INFO    Verifying patterns... 
+18:58:11 [Main.checkPatterns:221] INFO  Computing global dataflow fixpoint over the entire contract... 
+18:58:11 [AbstractDataflow.initDataflow:193] DEBUG 
+ 
+18:58:11 [AbstractDataflow.initDataflow:194] DEBUG Dataflow Analysis for must 
+18:58:11 [AbstractDataflow.initDataflow:202] DEBUG Workspace is: /home/moti/code/klevoya/inspect-analysis2/artefacts/souffle-0c52e085-3252-4a82-826e-366f0ba7c6e3/must 
+18:58:11 [MustExplicitDataflow.createFollowsRule:198] WARN  Found no outgoing branches for unconditional branch: require_auth_return () 
+18:58:11 [AbstractDataflow.initDataflow:216] DEBUG Number of instructions: 0 
+18:58:11 [AbstractDataflow.initDataflow:217] DEBUG Threshold: 200 
+18:58:11 [AbstractDataflow.initDataflow:193] DEBUG 
+ 
+18:58:11 [AbstractDataflow.initDataflow:194] DEBUG Dataflow Analysis for may 
+18:58:11 [AbstractDataflow.initDataflow:202] DEBUG Workspace is: /home/moti/code/klevoya/inspect-analysis2/artefacts/souffle-0c52e085-3252-4a82-826e-366f0ba7c6e3/may 
+18:58:11 [AbstractDataflow.initDataflow:216] DEBUG Number of instructions: 0 
+18:58:11 [AbstractDataflow.initDataflow:217] DEBUG Threshold: 200 
+18:58:11 [AbstractDataflow.executeSouffle:125] DEBUG Output workspace is: /home/moti/code/klevoya/inspect-analysis2/artefacts/souffle-0c52e085-3252-4a82-826e-366f0ba7c6e3_OUT 
+18:58:11 [AbstractDataflow.executeSouffle:137] INFO  Executing Datalog took: 0 min, 0 sec 
+18:58:11 [Main.outputPatternMatchSummary:254] INFO  
+---------------
+Pattern Summary
+=============== 
+18:58:11 [Main.outputPatternMatchSummary:258] INFO  NAME                         ID   RESULT     
+18:58:11 [Main.outputPatternMatchSummary:269] ERROR MissingReqAuthStr            116  violation  
+18:58:11 [Main.outputPatternMatchSummary:272] INFO  
+===============
+ 
+18:58:11 [Main.outputPatternMatchDetails:276] INFO  
+---------------
+Pattern Results Detail
+=============== 
+18:58:11 [Main.outputPatternMatchDetails:284] INFO  NAME                         ID   CONTEXT                                  INFOTYPE   INSTRUCTION                                                                                                                                  
+18:58:11 [Main.outputPatternMatchDetails:292] INFO  MissingReqAuthStr            116  simple_no_auth_check(i{}{?}, j{}{?})     element    (t{Const}{?}) = db_store_i64(n{Const}{-2.4010530888762168E18}, o{Const}{-3.0203716356402053E18}, j{}{?}, q{Const}{-2.4010530888762655E18}, r{Const}{100.0}, s{Const}{200.0}) 
+18:58:11 [Main.outputPatternMatchDetails:292] INFO  MissingReqAuthStr            116  simple_no_auth_check(i{}{?}, j{}{?})     comment    Authorisation for argument 'c{}{?}' unchecked                                                                                                
+18:58:11 [Main.outputPatternMatchDetails:294] INFO  
+===============
+ 
+18:58:11 [Main.main:168] INFO  
+---
+Analysis complete.
+---
+ 

@@ -1,0 +1,171 @@
+/*
+ *  Copyright 2020 Barracuda Systems Ltd
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+#define DEBUGOUT 1
+//#define INC_MUST_PRECEDE2 1
+
+// Maps instructions to their containing functions
+.decl inFunction(instr: Label, fn: Function)
+inFunction(instr, func) :-
+    fnInstr(func, instr).
+
+.decl functionBegin(instr: Label, fnName: Function)
+functionBegin(instr, func) :-
+    fnDefinitionArgument(instr, func, "0", _).
+
+.decl functionEnd(instr: Label, fnName: Function)
+functionEnd(instr, func) :-
+    fnDefinitionRtn(instr, func, _).
+
+.decl maySuccessor(instrFrom: Label, instrTo: Label)
+maySuccessor(instrFrom, instrTo) :-
+    fnCall(instrFrom, _, fnTo),
+    functionBegin(instrTo, fnTo).
+
+// Extend to next relations
+maySuccessor(instrFrom, instrTo) :-
+    maySuccessor(instrFrom, instrMid),
+    maySuccessor(instrMid, instrTo).
+
+.decl mayPredecessor(instrPrev: Label, instrNext: Label)
+mayPredecessor(instrPrev, instrNext) :-
+    maySuccessor(instrNext, instrPrev).
+
+.decl mayPredecessorFn(fnNext: Function, fnPrev: Function)
+mayPredecessorFn(prev, next) :-
+    fnCall(_, prev, next).
+
+mayPredecessorFn(prev, next) :-
+    mayPredecessorFn(prev, mid),
+    mayPredecessorFn(mid, next).
+
+// Does the predecessor function (?pred) of ?insn establish (at its end) a must-precede?
+.decl mustPrecedeAtPredecessor(callerInstr: Label, instrToInCallee: Label)
+
+/* mustPrecedeAtPredecessor(callerInstr, instrToInCallee) :-
+    mustPrecede(instrFromInCallee, instrToInCallee),
+    inFunction(instrToInCallee, callee),
+    inFunction(callerInstr, caller),
+    mayPredecessorFn(caller, callee).
+*/
+
+mustPrecedeAtPredecessor(callerInstr, instrToInCallee) :-
+    mustPrecede(calleeBeginInstr, instrToInCallee),
+    functionBegin(calleeBeginInstr, calleeFn),
+    fnCall(callerInstr, callerFn, calleeFn),
+    mayPredecessorFn(callerFn, calleeFn).
+
+// Quadratic explosion! Limit to EOS functions only?
+#ifdef INC_MUST_PRECEDE2
+.decl mustPrecede2(priorInstr: Label, callSite: Label, nextInstr: Label)
+mustPrecede2(prevInstr, callerInstr, nextInstr) :-
+    //!functionBegin(prevInstr, _),
+    mustPrecede(prevInstr, callerInstr),
+    mustPrecedeAtPredecessor(callerInstr, nextInstr).
+
+mustPrecede2(prevInstr, callerInstr, nextInstr) :-
+    mustPrecede2(prevInstr, _, callerInstr),
+    mustPrecede2(_, callerInstr, nextInstr).
+#endif
+/** Must Precedes relationship for both inter and intra-function callers. For efficiency limit to EOS intrinsics only.
+    Two ways to calulate: 1) Intra-function: take intra-function mustPrecede and add implicit caller context
+    2) Inter-function: use mustPrecede at predecessor rules and explicitly calculate caller context
+ */
+.decl mustPrecedeEosOnly(priorInstr: Label, callerInstrSite: Label, nextInstr: Label) brie
+
+
+/* Intra-function mustPrecede with context
+    If two EOS instructions precede each other, and
+    both instructions are contained in the same function,
+    then infer that they precede each other and are called from the same context (which is the
+    head of the function they are in).
+ */
+mustPrecedeEosOnly(prevInstr, callerInstr, nextInstr) :-
+    mustPrecede(prevInstr,nextInstr),
+    controlFlow.isInstrCallingAnEosFunction(prevInstr),
+    controlFlow.isInstrCallingAnEosFunction(nextInstr),
+    fnInstr(inFunction, prevInstr),
+    fnInstr(inFunction, nextInstr),
+    controlFlow.instructionCallers(callerInstr, nextInstr).     // TODO: Does this break Must relationship in case of multiple callers?
+
+/* Intra-function mustPrecede with context */
+mustPrecedeEosOnly(prevInstr, callerInstr, nextInstr) :-
+    //!functionBegin(prevInstr, _),
+    mustPrecede(prevInstr, callerInstr),
+    mustPrecedeAtPredecessor(callerInstr, nextInstr),
+    controlFlow.isInstrCallingAnEosFunction(prevInstr).     // Include this line to limit number of tuples to EOS fns
+
+/* Compute transitive closure of mustPrecedeEosOnly. Logically below is equivalent to:
+
+        mustPrecedeEosOnly(prevInstr, callerInstr, nextInstr) :-
+            mustPrecedeEosOnly(prevInstr, _, callerInstr),
+            mustPrecedeEosOnly(_, callerInstr, nextInstr),
+            controlFlow.isInstrCallingAnEosFunction(nextInstr).
+
+    However because we are recursing a relation with itself, this has abysmal performance (Souffle limitation).
+    So we replace the 2nd mustPrecedeEosOnly(_, callerInstr, nextInstr) with an inline version. */
+mustPrecedeEosOnly(prevInstr, callerInstr, nextInstr) :-
+    mustPrecedeEosOnly(prevInstr, _, callerInstr),
+    mustPrecede(_, callerInstr),
+    mustPrecedeAtPredecessor(callerInstr, nextInstr),
+    controlFlow.isInstrCallingAnEosFunction(nextInstr).     // Include this line to limit number of tuples to EOS fns
+
+.decl flowsToVarBetwFunctions(callerSite: Label, funcLabel: Label, varInFuncDefinition: Var, fact: VarFact)
+
+/* Take var/fact assignment and propagate it from function caller to the variable in the function definition
+   Need to work out function call graph on the fly when propagating dataflow between functions
+
+    L1: foo() {
+    L2:     int b;
+    L3:     bar(b);     // c = b, assignType(b, bar)
+    L4: }
+    L5: bar(c) {        // Function definition has argument c. Variable b from foo() flows into c
+    L6:     int d = c;  // c then flows into d, therefore b flows to d
+    L7: }
+
+    functionAssign(L3, c, b) == flowsToVar(L3, c, b),
+    flowsToVar(L6, d, c) =>
+    flowsToVarBetwFunctions(L3, L6, d, b);
+
+    flowsToVar(L3, c, bar),
+    flowsToVar(L6, d, c) =>
+    flowsToVarBetwFunctions(L3, L6, c, bar);
+
+    IF at callerSite, the information in varFactCaller flows into the variable in the function definition, varInFuncDefinition, AND,
+    IF in the called function, at labelInFunc, the varInFuncDefinition flows into the variable varDestInFunc,
+    THEN, at the given callerSite context, within called function at labelInFunc, the varFactCaller flows into the
+        variable in the destination function, varDestInFunc.
+ */
+flowsToVarBetwFunctions(callerSite, labelInFunc, varDestInFunc, varFactCaller) :-
+    fnCall(callerSite, _, calledFunc),
+    fnInstr(calledFunc, labelInFunc),
+    flowsToVar(callerSite, varInFuncDefinition, varFactCaller),
+    flowsToVar(labelInFunc, varDestInFunc, varInFuncDefinition).
+
+
+#ifdef DEBUGOUT
+.output functionBegin
+.output functionEnd
+.output fnCall
+.output mayPredecessor
+.output mayPredecessorFn
+.output mustPrecedeAtPredecessor
+#ifdef INC_MUST_PRECEDE2
+.output mustPrecede2
+#endif
+.output mustPrecedeEosOnly
+.output flowsToVarBetwFunctions
+#endif

@@ -1,0 +1,61 @@
+/*
+ *  Copyright 2020 Barracuda Systems Ltd
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+.comp MissingReqAuthRem : Pattern {
+    NAME("Missing Input Validation (Update)")
+
+    DESCRIPTION(STR_JOIN(
+                            "Contracts that remove RAM values must check that ",
+                            "they are authorised to do so."))
+
+    SEVERITY(MEDIUM)
+
+    applicable(context, instruction, line) :-
+        controlFlow.instructionCallers(context, instruction),
+        isDbRemove(instruction),
+        line = "placemarker".
+
+    .decl isDbRemove(instruction: Label)
+    isDbRemove(instruction) :-
+        dbremove(instruction, _).
+
+    compliance(context, instruction, line, "SAFE") :-
+        applicable(context, instruction, line),
+        reqauthMustPrecedeDbremove(context, instruction).
+
+    .decl reqauthMustPrecedeDbremove(callerContext: Label, dbremoveInstr: Label)
+    reqauthMustPrecedeDbremove(callerContext, dbremoveInstr) :-
+        getReqauth(reqauthInstr),
+        mustAnalysis.mustPrecedeEosOnly(reqauthInstr, callerContext, dbremoveInstr).
+
+    violation(context, instruction, line, STR_JOIN("Authorisation for dbremove unchecked")) :-
+        applicable(context, instruction, line),
+    #ifdef MAY_CONTROL_FLOW
+        getReqauth(reqauth),
+        !mayAnalysis.isAfter(reqauth, instruction).
+    #else
+        getReqauth(reqauth).
+    #endif
+        // dbRemoveNotAfterReqauth(reqauth, instruction).
+
+    /* .decl dbRemoveNotAfterReqauth(requathInstr:Label, dbremoveInstr: Label)
+    dbRemoveNotAfterReqauth(reqauthInstr, dbremoveInstr) :- !mayAnalysis.isAfter(reqauthInstr, dbremoveInstr).
+    */
+
+    .decl getReqauth(instruction: Label)
+    getReqauth(instr) :-
+        fnCall(instr, _, "require_auth").
+}

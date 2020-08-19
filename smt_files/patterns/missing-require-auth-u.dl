@@ -1,0 +1,83 @@
+/*
+ *  Copyright 2020 Barracuda Systems Ltd
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+.comp MissingReqAuthUpd : Pattern {
+    NAME("Missing Input Validation (Update)")
+
+    DESCRIPTION(STR_JOIN(
+                            "Contracts that change RAM values must check that ",
+                            "the payer is authorised to do so."))
+
+    SEVERITY(MEDIUM)
+
+    applicable(context, instruction, line) :-
+        controlFlow.instructionCallers(context, instruction),
+        isDbUpdate(instruction),
+        line = "placemarker".
+
+    .decl isDbUpdate(instruction: Label)
+    isDbUpdate(instruction) :-
+        dbupdate(instruction, _, _, _).
+
+    compliance(context, instruction, line, "db_update_i64() is preceded by require_auth() and payer is checked") :-
+        applicable(context, instruction, line),
+        reqauthMustPrecedeDbupdate(context, instruction),
+        payerMustHaveAuthChecked(context, instruction).
+
+    .decl reqauthMustPrecedeDbupdate(callerContext: Label, dbupdateInstr: Label)
+    reqauthMustPrecedeDbupdate(callerContext, dbupdateInstr) :-
+        hasReqauth(reqauthInstr),
+        mustAnalysis.mustPrecedeEosOnly(reqauthInstr, callerContext, dbupdateInstr).
+
+    /* Check information flow of Payer. This can be ether:
+        - Information flow in a single function hence we use flowsToVar() and then get the calling context separately.
+        - Or, between funcitions, hence we use the context sensitive flowsToVarBetwFunctions()
+    */
+    .decl payerMustHaveAuthChecked(callerContext: Label, dbupdateInstr: Label)
+    payerMustHaveAuthChecked(callerContext, dbupdateInstr) :-
+        fnDefinitionArgument(_, "db_update_i64", "1", payer),
+        (
+            (
+                mustAnalysis.flowsToVar(dbupdateInstr, payer, "require_auth"),      // (Currently inter and intra-function information flows are separate)
+                controlFlow.instructionCallers(callerContext, dbupdateInstr)
+            );
+            mustAnalysis.flowsToVarBetwFunctions(callerContext, dbupdateInstr, payer, "require_auth")
+        ).
+
+    /*
+        For a given database instruction, this pattern is violated if there's no corresponding require_auth instruction.
+        I.e., violation <=> not [exists require_auth instruction that may flow to db_update]
+    */
+    violation(context, instruction, line, matchComment) :-
+        applicable(context, instruction, line),
+        fnDefinitionArgument(_,"db_update_i64","1", payer),
+        (!dbUpdatePayerChecked(context, instruction, payer), matchComment = STR_JOIN("Authorisation for argument '", payer,"' unchecked")).
+
+    .decl dbUpdatePayerChecked(callerContext: Label, dbupdateInstr: Label, dbpayer:Var)
+    dbUpdatePayerChecked(callerContext, dbupdateInstr, payer2) :-
+        isDbUpdate(dbupdateInstr),
+        hasReqauth(reqauthInstr),
+        fnCallArgument(reqauthInstr,_, "0", payer1),
+        controlFlow.instructionCallers(callerContext, dbupdateInstr),    // Get the right callerContext for a given dbStore instruction
+        (
+            mayAnalysis.flowsToVar(dbupdateInstr, payer2, payer1);      // (Currently inter and intra-function information flows are separate)
+            mayAnalysis.flowsToVarBetwFunctions(callerContext, dbupdateInstr, payer2, payer1)
+        ).
+
+    .decl hasReqauth(instruction: Label)
+    hasReqauth(instr) :-
+        fnCall(instr, _, "require_auth").
+}
