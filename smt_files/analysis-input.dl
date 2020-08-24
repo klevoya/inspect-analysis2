@@ -16,13 +16,11 @@
 
 #define ENABLE_INPUT_FROM_FILES
 
-.symbol_type Label
-.symbol_type Instruction
-.symbol_type Var
-.symbol_type Fact
-.symbol_type Function
-.symbol_type Index
-.type VarFact = Var|Fact
+.type Label <: symbol
+.type Instruction <: symbol
+.type Var <: symbol
+.type Function <: symbol
+.type Index <: symbol
 .type Element = Label | Instruction | Function      // any program element
 
 //
@@ -30,10 +28,11 @@
 // May and Must facts are equivalent with the exception of follows, join & jump. In addition taint only exists for May.
 // TODO: Consolidate the facts in Java Dataflow
 //
-.decl assignType    (l:Label, v:Var, f:Fact)
+.decl assignType    (l:Label, v:Var, f:Var)
 GET_REL_FROM_FILE(assignType, "must/assignType.facts")
 
 .decl assignVar		(l:Label, v1: Var, v2: Var)
+
 GET_REL_FROM_FILE(assignVar, "must/assignVar.facts")
 
 // Linear following instructions as well as branches
@@ -73,10 +72,10 @@ GET_REL_FROM_FILE(oneBranchTag, "must/oneBranchTag.facts")
 .decl endIf		    (l1: Label, l2: Label)
 GET_REL_FROM_FILE(endIf, "must/endIf.facts")
 
-.decl mload		    (l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
+.decl mload		    (l: Label, dynOffset:Var, memargOffset:Var, f:Var)
 GET_REL_FROM_FILE(mload, "must/mload.facts")
 
-.decl mstore		(l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
+.decl mstore		(l: Label, dynOffset:Var, memargOffset:Var, f:Var)
 GET_REL_FROM_FILE(mstore, "must/mstore.facts")
 
 .decl memcpy		(l: Label, destOffset:Var, srcOffset:Var)
@@ -94,10 +93,10 @@ GET_REL_FROM_FILE(dbupdate, "must/dbupdate.facts")
 .decl dbremove		(l: Label, itr:Var)
 GET_REL_FROM_FILE(dbremove, "must/dbremove.facts")
 
-.decl unk	        (f:VarFact)
+.decl unk	        (f:Var)
 GET_REL_FROM_FILE(unk, "must/unk.facts")
 
-.decl throw		    (l: Label, f:Fact, v:Var)
+.decl throw		    (l: Label, f:Var, v:Var)
 GET_REL_FROM_FILE(throw, "must/throw.facts")
 
 // Not sure this is easy to extract a priori? Alternative is to do in datalog, but could be messy

@@ -44,16 +44,16 @@
     .decl reassignDatabase    (l: Label, v: Var)
     .decl removeDatabase    (l: Label, v: Var)
     .decl mustPrecedeStep    (l1: Label, l2: Label)
-    .decl mstoreOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
-    .decl mloadOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
+    .decl mstoreOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:Var)
+    .decl mloadOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:Var)
     .decl memcpyOffsetsPropagtd (l: Label, destOffset:Var, srcOffset:Var)
 
     //
     // Outputs
     //
-    .decl flowsToVar           (l: Label, v: Var, f: VarFact)
-    .decl flowsToMem        (l: Label, dynOffset: Var, memargOffset: Var, f:VarFact)
-    .decl database            (instr: Label, iterator: Var, payer:Var, f: VarFact)
+    .decl flowsToVar           (l: Label, v: Var, f: Var)
+    .decl flowsToMem        (l: Label, dynOffset: Var, memargOffset: Var, f:Var)
+    .decl database            (instr: Label, iterator: Var, payer:Var, f: Var)
     .decl mustPrecede        (l1: Label, l2: Label)
     .decl functionAssign    (l: Label, v1: Var, v2: Var)
 
@@ -210,10 +210,10 @@
 
     /* Propagate Facts for memory reads.
      * Loading contents from memory address [DynOffset, MemargOffset] into Var, and
-     * If a VarFact flowed into the same address, then VarFact flows through that memory into Var.
+     * If a Var flowed into the same address, then Var flows through that memory into Var.
      */
-    flowsToVar(LabLoad, Var, VarFact) :-
-        flowsToMem(LabMem, DynOffset, MemargOffset, VarFact),   // e.g. mstore(DynOffset, MemargOffset) <= VarFact
+    flowsToVar(LabLoad, Var, Var) :-
+        flowsToMem(LabMem, DynOffset, MemargOffset, Var),   // e.g. mstore(DynOffset, MemargOffset) <= Var
         mustPrecede(LabMem, LabLoad),
         mloadOffsetsPropagtd(LabLoad, DynOffset, MemargOffset, Var).           // Var = mload(DynOffset, MemargOffset)
 
