@@ -18,6 +18,7 @@
 //#define INC_MUST_PRECEDE2 1
 
 // Maps instructions to their containing functions
+// Rex: Maybe redundant
 .decl inFunction(instr: Label, fn: Function)
 inFunction(instr, func) :-
     fnInstr(func, instr).

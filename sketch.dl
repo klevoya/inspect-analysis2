@@ -1,0 +1,67 @@
+// Inter-procedural
+// 1-call-site sensitive
+// Context = Caller function name
+
+// How to handle function loop up ?
+
+/* Information Flow */
+
+// Init
+VarPointsTo(ctx, var, heap):-
+Alloc(var, heap),
+ctx=?.
+
+// Copy
+VarPointsTo(ctx, to, heap):-
+Move(to, from),
+VarPointsTo(ctx, from, heap).
+
+// Other data structures: field, array etc.
+
+// Args Mapping
+CallGraph(instr, callerCtx, calleeCtx), // Track the caller context
+VarPointsTo(calleeCtx, arg, heap):-
+FuncCall(instr, func), 
+FuncInstr(calleeCtx, instr), // calleeCtx = caller function name
+FormalArgs(arg, func, index),
+ActualArgs(var, func, index),
+VarPointsTo(callerCtx, var, heap).
+
+// Return Mapping
+/* if the return var is derived from the function arguement,
+its ctx should be the same as the args(i.e. calleeCtx)
+*/
+VarPointsTo(callerCtx, to, heap):-
+AssignReturn(instr, to),
+FuncCall(instr, func),
+Return(var, func), 
+CallGraph(instr, callerCtx, calleeCtx),
+VarPointsTo(calleeCtx, var, heap).
+
+
+/* Control Flow */
+
+// Inter-procedural
+
+
+BB(head, tail)
+
+NextInBB(prev, next)
+
+NextBB(prevTail, nextHead)
+
+
+/* Patterns */
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -69,10 +69,10 @@
     //
 #ifdef MAY_CONTROL_FLOW
     // Below is higher granularity, but leads to combinatorial explosion. Try to limit to functions of interest
-    isAfter(LabFrom, LabTo) :- mayfollows(LabFrom, LabTo).
+    isAfter(LabFrom, LabTo) :- follows(LabFrom, LabTo).
 
     isAfter(LabFrom, LabTo) :- isAfter(LabFrom, Lab),
-                               mayfollows(Lab, LabTo).
+                               follows(Lab, LabTo).
 
     // If the instruction at LabTo follows an instruction at LabThenElse, and
     // If there is a branch statement at LabIf that branches to LabThenElse, based on condition Var, and
@@ -90,7 +90,7 @@
     ---*/
     // Convert each assignment into context-free dataflow rules
     flowsToVar(Lab, Var, Fact) :- assignVar(Lab, Var, Fact).
-    flowsToVar(Lab, Var, Fact) :- assignType(Lab, Var, Fact).
+    // flowsToVar(Lab, Var, Fact) :- assignType(Lab, Var, Fact).
     flowsToVar(Lab, Var, Fact) :- throw(Lab, Fact, Var).
 
     flowsToVar(Lab, VarDest, VarSrc) :-

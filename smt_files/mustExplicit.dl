@@ -108,7 +108,8 @@
     ---*/
     // Convert each assignment into flows to rule with instruction context.
     flowsToVar(Lab, Var, Fact) :- assignVar(Lab, Var, Fact).
-    flowsToVar(Lab, Var, Fact) :- assignType(Lab, Var, Fact).
+    // Rex: ?
+    // flowsToVar(Lab, Var, Fact) :- assignType(Lab, Var, Fact).
     flowsToVar(Lab, Var, Fact) :- throw(Lab, Fact, Var).
 
     // Propagate information flow from source to destination considering control flow

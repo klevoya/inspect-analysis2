@@ -49,6 +49,7 @@
     .output compliance
     .output violation
 
+    // Rex: Not used
     matchId(context, element) :-
         (
             applicable(context, element, _);
