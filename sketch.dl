@@ -8,47 +8,133 @@
 
 // Init
 VarPointsTo(ctx, var, heap):-
-Alloc(var, heap),
-ctx=?.
+	Alloc(var, heap),
+	ctx=?.
 
 // Copy
 VarPointsTo(ctx, to, heap):-
-Move(to, from),
-VarPointsTo(ctx, from, heap).
+	Move(to, from),
+	VarPointsTo(ctx, from, heap).
 
 // Other data structures: field, array etc.
 
 // Args Mapping
-CallGraph(instr, callerCtx, calleeCtx), // Track the caller context
+CallGraph(insn, callerCtx, calleeCtx), // Track the caller context
 VarPointsTo(calleeCtx, arg, heap):-
-FuncCall(instr, func), 
-FuncInstr(calleeCtx, instr), // calleeCtx = caller function name
-FormalArgs(arg, func, index),
-ActualArgs(var, func, index),
-VarPointsTo(callerCtx, var, heap).
+	FuncCall(insn, func), 
+	FuncInsn(calleeCtx, insn), // calleeCtx = caller function name
+	FormalArgs(arg, func, index),
+	ActualArgs(var, func, index),
+	VarPointsTo(callerCtx, var, heap).
 
 // Return Mapping
 /* if the return var is derived from the function arguement,
 its ctx should be the same as the args(i.e. calleeCtx)
 */
 VarPointsTo(callerCtx, to, heap):-
-AssignReturn(instr, to),
-FuncCall(instr, func),
-Return(var, func), 
-CallGraph(instr, callerCtx, calleeCtx),
-VarPointsTo(calleeCtx, var, heap).
+	AssignReturn(insn, to),
+	FuncCall(insn, func),
+	Return(var, func), 
+	CallGraph(insn, callerCtx, calleeCtx),
+	VarPointsTo(calleeCtx, var, heap).
 
 
 /* Control Flow */
 
 // Inter-procedural
 
+FuncEntry(func, firstInsn).
 
-BB(head, tail)
+// First Instruction, Begin of function, If/Else block
+BasicBlockBegin(insn):-
+	FuncEntry(_, insn). // Not sure if needed for every function
 
-NextInBB(prev, next)
+BasicBlockBegin(to):-
+	Jump(_, to),
+	!Return(to).
 
-NextBB(prevTail, nextHead)
+// BB: 1 -> 2 -> 3
+
+// 1, 2
+// 2, 3
+NextInSameBasicBlock(insn, next):-
+	Follows(insn, next),
+	!BasicBlockBegin(next).
+
+
+// 1, 1
+// 1, 2
+// 1, 3
+BasicBlockHead(insn, insn):-
+	BasicBlockHeadBegin(insn).
+
+BasicBlockHead(head, next) :-
+   BasicBlockHead(head, insn),
+   NextInSameBasicBlock(insn, next).
+
+// 3
+BasicBlockEnd(end):-
+	BasicBlockHead(_, end),
+	!NextInSameBasicBlock(end, _).
+
+// Constructing CFG of instructions
+// Assuming Jump is the only constrol transfer
+NextInsn(insn, next):-
+	Follows(insn, next),
+	!Jump(insn, next).
+
+NextInsn(insn, next):-
+	Jump(insn, next),
+	!FunctionCall(insn, _).
+
+// Constructing CFG of basic blocks
+// BB1: 1 -> 2(jump BB2)
+// BB2: 3 -> 4
+// 					1, 3
+NextBasicBlock(prevBB, nextBB):-
+	BasicBlockHead(prevBB, prevEnd) // 1, 2
+	BasicBlockEnd(prevEnd), // 2
+	BasicBlockBegin(nextBB), // 3
+	NextInsn(prevEnd, nextBB). // 2, 3
+
+BBInFunc(insn, func):-
+	BasicBlockBegin(insn),
+	FuncInsn(func, insn).
+
+
+// Dominate relation within function scope 
+/**
+	A
+	| \
+	|  B
+	| /
+	C
+
+	A -> B
+	B -> C
+	A -> C
+**/
+
+// bb does not dominate start
+// B, A
+// C, A
+NotDominate(bb, start):- 
+    FuncEntry(func, start), 
+    BBInFunc(bb, func),
+    bb != start.
+
+// B, C | C, B
+NotDominate(next, bb):- 
+    NotDominate(bb, prev), // B, A | C, A
+    NextBasicBlock(prev, next), // A, C | A, B
+    next != bb. // for the loop
+
+// A, B
+// A, C
+Dominate(dominator, bb):-
+	BBInFunc(dominator, func),
+	BBInFunc(bb, func),
+	!NotDominate(dominator, bb).
 
 
 /* Patterns */
