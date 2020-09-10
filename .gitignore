@@ -3,3 +3,5 @@
 artefacts/
 logs/
 *.iml
+**._*
+**.DS_Store

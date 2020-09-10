@@ -1,5 +1,7 @@
 #include <eosio/eosio.hpp>
-//#include <eosio/print.hpp>
+// #include <eosio/asset.hpp>
+
+// #include <eosio/print.hpp>
 
 
 using namespace eosio;
@@ -10,12 +12,21 @@ class hello : public contract {
       using contract::contract;
 
 
-      [[eosio::action]]
-      void hi( name user ) {
-         //require_auth( user );
-         //print( "Hello, ", user);
+      [[eosio::on_notify("eosio.token::transfer")]]
+      void hi( name user) {
+         
       }
+
+     //  [[eosio::action]]
+     //  void something(name user){
+     //  	action(
+	    //   permission_level{get_self(),"active"_n},
+	    //   get_self(),
+	    //   "hi"_n,
+	    //   std::make_tuple(user)
+	    // ).send();
+     //  }
 };
 
 
-EOSIO_DISPATCH( hello, (hi))
+EOSIO_DISPATCH( hello, (hi));
