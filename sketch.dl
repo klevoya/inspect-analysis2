@@ -150,8 +150,8 @@ ReachableBB(bb, next):-
 /* Numerical Overflow */
 
 /* Violation:
-1. Action parameters/ DB data
-2. Math Ops
+1. Action parameters/ DB data 
+2. Math Ops (Could also be stricted ro reachable to db_store)
 3. Vars are not in eosio_assert 
 */
 
@@ -218,14 +218,13 @@ Tracking the first 64 bits could be tricky
 */
 
 SafeInline(check):-
-	ActualArgs(check, "send_inline", "0", payer),
+	ActualArgs(check, "send_inline", "0", payer), // could limit to only reachable from db_store
 	VarPointsTo(payer, first64bits)
 	first64bits = "0".
 
 Violation(insn):-
 	FuncCall(insn, "send_inline"),
-	!Violation()
-
+	!SafeInline(insn).
 
 
 /** Unbounded Iterations **/
@@ -254,7 +253,8 @@ Violation(insn):-
 	NotifyFuncCall(insn),
 	FormalArgs(_, "apply", 0, reciever),
 	FormalArgs(_, "apply", 1, code),
-	IfCond(ifInsn, reciever, code), // reciever == code
+	(IfCond(ifInsn, reciever, code); // reciever == code
+	!IfCond(ifInsn, reciever, _)), // No checking
 	Reachable(ifInsn, insn),
 
 /* Fake token transfers */
@@ -269,7 +269,7 @@ NotifyFuncCall(insn).
 SafeNotify(insn):-
 	NotifyFuncCall(insn),
 	FormalArgs(_, "apply", 1, code),
-	IfCond(ifInsn, code, "eosio_token"), // if it is availble from decompiler
+	IfCond(ifInsn, code, "eosio::token"), // if it is availble from decompiler
 	Dominate(ifInsn, insn).
 
 Violation(insn):-
