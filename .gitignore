@@ -5,3 +5,4 @@ logs/
 *.iml
 **._*
 **.DS_Store
+database/

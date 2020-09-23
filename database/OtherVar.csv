@@ -1,7 +1,0 @@
-f{Const}{?}
-k{Eq}{?}
-g{Const}{?}
-p{Const|Add}{?}
-r{Const|Add|Ne}{?}
-s{Const}{?}
-t{Const}{?}
