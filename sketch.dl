@@ -218,9 +218,9 @@ Tracking the first 64 bits could be tricky
 */
 
 SafeInline(check):-
-	ActualArgs(check, "send_inline", "0", payer), // could limit to only reachable from db_store
-	VarPointsTo(payer, first64bits)
-	first64bits = "0".
+	ActualArgs(check, "send_inline", "0", receiver), // could limit to only reachable from db_store
+	VarPointsTo(receiver, first64bits),
+	first64bits = "receiver". // self, apply(receiver)
 
 Violation(insn):-
 	FuncCall(insn, "send_inline"),
@@ -244,6 +244,13 @@ NotifyFunc(func, start, insn):-
 	Reachable(start, insn).
 
 // notify function call within/reachable from apply
+
+// apply(){
+//	switch(){
+//		case:
+// insn		notify()
+//	}
+//}
 NotifyFuncCall(insn):-
 	NotifyFunc(func, _, _),
 	FuncCall(insn, func),
@@ -266,7 +273,7 @@ Violation(insn):-
 
 NotifyFuncCall(insn).
 
-SafeNotify(insn):-
+SafeToken(insn):-
 	NotifyFuncCall(insn),
 	FormalArgs(_, "apply", 1, code),
 	IfCond(ifInsn, code, "eosio::token"), // if it is availble from decompiler
@@ -274,7 +281,7 @@ SafeNotify(insn):-
 
 Violation(insn):-
 	NotifyFuncCall(insn),
-	!SafeNotify(insn).
+	!SafeToken(insn).
 
 
 /* Fake Notification */
@@ -290,7 +297,7 @@ NotifyFunc(func, start, insn).
 // Assume user only checks the parameters
 SafeNotify(start):-
 	NotifyFunc(func, start, insn),
-	FormalArgs(_, func, 0 | 1, var),
+	FormalArgs(_, func, 0 | 1, var), // "0" => from | "1" => to
 	IfCond(ifInsn, var, "0"), 
 	Reachable(start, ifInsn),
 	Dominate(ifInsn, insn). // could be assumed always after if for performance

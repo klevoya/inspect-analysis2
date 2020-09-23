@@ -1,0 +1,16 @@
+.type Var <: symbol
+.type Index <: symbol
+
+.type Label <: symbol
+
+
+.decl assignVar		(label: Label, to: Var, from: Var)
+GET_REL_FROM_FILE(assignVar, "must/assignVar.facts")
+
+
+
+.decl mload		    (label: Label, dynOffset:Var, memargOffset:Var, f:Var)
+GET_REL_FROM_FILE(mload, "must/mload.facts")
+
+.decl mstore		(label: Label, dynOffset:Var, memargOffset:Var, f:Var)
+GET_REL_FROM_FILE(mstore, "must/mstore.facts")

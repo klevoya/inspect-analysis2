@@ -1,0 +1,13 @@
+f{Const}{?}
+h{Const}{1.0}
+k{Eq}{?}
+d{}{?}
+e{}{?}
+g{Const}{?}
+l{Const}{3.0}
+m{Const}{2.0}
+p{Const|Add}{?}
+o{Const}{1.0}
+r{Const|Add|Ne}{?}
+s{Const}{?}
+t{Const}{?}
