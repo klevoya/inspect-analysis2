@@ -228,6 +228,11 @@ Violation(insn):-
 
 
 /** Unbounded Iterations **/
+/* Violation: 
+1. Check iterator in while condition
+2. No other restriction (e.g. time, counter)
+*/
+
 /** TODO: Low Priority **/
 
 

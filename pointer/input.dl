@@ -1,16 +1,49 @@
+#include "../smt_files/util-macros.dl"
+
 .type Var <: symbol
-.type Index <: symbol
+.type Index <: number
+.type Insn <: symbol
+.type Function <: symbol
 
-.type Label <: symbol
+.decl _AssignVar(insn: Insn, to: Var, from: Var)
+GET_REL_FROM_FILE(_AssignVar, "must/assignVar.facts")
 
+.decl _Load(insn: Insn, dynOffset: Var, memargOffset: Var, f: Var)
+GET_REL_FROM_FILE(_Load, "must/mload.facts")
 
-.decl assignVar		(label: Label, to: Var, from: Var)
-GET_REL_FROM_FILE(assignVar, "must/assignVar.facts")
+.decl _Store(insn: Insn, dynOffset: Var, memargOffset: Var, f: Var)
+GET_REL_FROM_FILE(_Store, "must/mstore.facts")
 
+// Mapping of each instruction to its containing function
+.decl _FuncInsn(func: Function, insn: Insn)
+GET_REL_FROM_FILE(_FuncInsn, "must/fnInstr.facts")
 
+.decl _Follows(prev: Insn, next: Insn)
+GET_REL_FROM_FILE(_Follows, "must/follows.facts")
 
-.decl mload		    (label: Label, dynOffset:Var, memargOffset:Var, f:Var)
-GET_REL_FROM_FILE(mload, "must/mload.facts")
+.decl _Jump(from: Insn, to: Insn, cond: Var)
+GET_REL_FROM_FILE(_Jump, "must/jump.facts")
 
-.decl mstore		(label: Label, dynOffset:Var, memargOffset:Var, f:Var)
-GET_REL_FROM_FILE(mstore, "must/mstore.facts")
+.decl _Else(if: Insn, else: Insn)
+GET_REL_FROM_FILE(_Else, "must/else.facts")
+
+.decl _FallThrough(if: Insn, next: Insn)
+GET_REL_FROM_FILE(_FallThrough, "must/fallThrough.facts")
+
+// Captures the actual arguments at the invocation of a function
+.decl _ActualArgs      (callSite: Insn, func: Function, index: Index, arg: Var)
+GET_REL_FROM_FILE(_ActualArgs, "must/fnCallArgument.facts")
+
+// Function call from given label i.e. invocation site
+.decl _FuncCall            (callSite: Insn, from: Function, to: Function)
+GET_REL_FROM_FILE(_FuncCall, "must/fnCall.facts")
+
+.decl _CopyAssignment            (insn: Insn, to: Var, from: Var)
+GET_REL_FROM_FILE(_CopyAssignment, "must/copyAssign.facts")
+
+// For a formal function definition. Shows which variable is an argument of the
+// function at a certain index, i.e. n-th argument
+.decl _FormalArgs   (funcDef:Insn, func: Function, index: Index, arg: Var)
+GET_REL_FROM_FILE(_FormalArgs, "must/fnDefinitionArgument.facts")
+
+// #include "../smt_files/analysis_input.dl"

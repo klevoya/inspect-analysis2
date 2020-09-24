@@ -1,0 +1,169 @@
+#include "control.dl"
+
+.decl VarPointsTo(var1: Var, var2: Var)
+.output VarPointsTo
+
+// For require_auth, the user should only come from apply(...) or get_self()
+// copys
+VarPointsTo(to, from):-
+	_CopyAssignment(_, to, from).
+
+VarPointsTo(to, var):-
+	_CopyAssignment(_, to, from),
+	VarPointsTo(from, var).
+
+// argument mapping
+VarPointsTo(to, from):-
+	_ActualArgs(_, func, index, from),
+	_FormalArgs(_, func, index, to).
+
+/* Auth Check */
+
+/* Violation: 
+1. DB Insn
+2. Not preceed by require_auth()
+*/
+
+.decl DBInsn(insn: Insn)
+.output DBInsn
+
+DBInsn(insn):-
+	_FuncCall(insn, _, dbOps),
+	(dbOps = "db_update_i64";
+	dbOps = "db_store_i64").
+
+
+// Assume auth check and db access are in the same function
+// reuqire_auth() called before db operation
+.decl AuthForDB(check: Insn, dbInsn: Insn)
+.output AuthForDB
+
+/*
+func(){
+	BB:
+		auth()
+		dbOps()
+}
+
+*/
+
+// check and dbOps are in same block
+AuthForDB(check, dbInsn):-
+	DBInsn(dbInsn),
+	_FuncCall(check, _, "require_auth"),
+	ReachableInBB(check, dbInsn).
+
+/*
+func(){
+	BB:
+		auth()
+	BB2:
+		dbOps()
+}
+
+*/
+// different block
+AuthForDB(check, dbInsn):-
+	DBInsn(dbInsn),
+	_FuncCall(check, _, "require_auth"),
+	BasicBlockHead(dbHead, dbInsn),
+	BasicBlockHead(checkHead, check),
+	DominateBB(checkHead, dbHead). 
+
+
+.decl SafeDBOps(dbInsn: Insn)
+.output SafeDBOps
+
+// only safe if the users are the same in both instructions
+SafeDBOps(dbInsn):-
+	AuthForDB(check, dbInsn),
+	_ActualArgs(check, "require_auth", 0, var1),
+	_ActualArgs(dbInsn, _, 2, var2),
+	VarPointsTo(var1, user),
+	VarPointsTo(var2, user).
+
+// different function
+#ifdef InterProcedural
+
+
+/* 
+func1{
+	check();
+	func2();
+}
+func2(){
+	DBops();
+}
+*/
+
+// check, func2
+AuthDomFunc(check, newFunc):-
+	_FuncCall(check, _, "require_auth"),
+	DominateBB(check, head),
+	BasicBlockHead(head, insn),
+	_FuncCall(insn, _, newFunc).
+
+
+/* 
+func1{
+	check()
+}
+func2{
+	func1();
+	DBops();
+	....
+}
+*/
+
+AuthForDB(check, dbInsn):-
+	_FuncCall(check, fromFunc, "require_auth"),
+	_FuncCall(checkCall, newFunc, fromFunc),
+	DBInsn(dbInsn),
+	(BasicBlockHead(dbHead, dbInsn),
+	BasicBlockHead(checkHead, checkCall),
+	DominateBB(checkHead, dbHead));
+	(ReachableInBB(checkCall, dbInsn)). 
+
+
+/* 
+func1{
+	check()
+}
+func2{
+	func1();
+	func3();
+}
+func3(){
+	DBops();
+}
+*/
+
+// check, func3
+AuthDomFunc(check, newFunc):-
+	_FuncCall(check, checkFunc, "require_auth"),
+	_FuncCall(checkCall, fromFunc, checkFunc),
+	_FuncCall(otherFuncCall, fromFunc, _),
+	(BasicBlockHead(funcHead, otherFuncCall),
+	BasicBlockHead(checkHead, checkCall),
+	DominateBB(checkHead, funcHead));
+	(ReachableInBB(checkCall, otherFuncCall)).
+
+	
+// recursion, can be overlooked for performance
+AuthDomFunc(check, newFunc):-
+	AuthDomFunc(check, fromFunc),
+	_FuncCall(_, fromFunc, newFunc).
+
+AuthForDB(check, dbInsn):-
+	AuthDomFunc(check, func),
+	DBInsn(dbInsn),
+	_FuncInsn(func, dbInsn).
+
+#endif
+
+.decl Violation(insn: Insn)
+.output Violation
+
+Violation(insn):-
+	DBInsn(insn),
+	!SafeDBOps(insn).

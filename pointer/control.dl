@@ -1,0 +1,150 @@
+#include "input.dl"
+
+.decl FuncEntry(func: Function, firstInsn: Insn)
+.output FuncEntry
+
+
+FuncEntry(func, insn):-
+	_FormalArgs(insn, func, _, _).
+
+.decl BasicBlockBegin(begin: Insn)
+.output BasicBlockBegin
+
+.decl IfElse(from: Insn, to: Insn)
+.output IfElse
+
+IfElse(if, to):-
+	_Jump(if, to, _);
+	_Else(if, to);
+	_FallThrough(if, to).
+
+// begin of function, 
+BasicBlockBegin(insn):-
+	FuncEntry(_, insn).
+
+// If/Else block
+BasicBlockBegin(insn):-
+	IfElse(_, insn).
+
+
+.decl NextInSameBasicBlock(insn: Insn, next: Insn)
+.output NextInSameBasicBlock
+
+// BB: 1 -> 2 -> 3
+
+// 1, 2
+// 2, 3
+NextInSameBasicBlock(insn, next):-
+	_Follows(insn, next),
+	!BasicBlockBegin(next). // not sure if needed ?
+
+
+// insn belongs to a basic block with head 
+.decl BasicBlockHead(head: Insn, insn: Insn)
+.output BasicBlockHead
+
+
+// 1, 1
+// 1, 2
+// 1, 3
+BasicBlockHead(insn, insn):-
+	BasicBlockBegin(insn).
+
+BasicBlockHead(head, next) :-
+   BasicBlockHead(head, insn),
+   NextInSameBasicBlock(insn, next).
+
+.decl BasicBlockEnd(end: Insn)
+.output BasicBlockEnd
+
+// 3
+BasicBlockEnd(end):-
+	BasicBlockHead(_, end),
+	!NextInSameBasicBlock(end, _).
+
+
+.decl NextBasicBlock(prev: Insn, next: Insn)
+.output NextBasicBlock
+
+
+// Assuming If/Else is the only the only control transfer in a function
+// Constructing CFG of basic blocks
+// BB1: 1 -> 2(jump BB2)
+// BB2: 3 -> 4
+
+// 1, 3
+NextBasicBlock(prevBB, nextBB):-
+	// 1, 2
+	BasicBlockHead(prevBB, prevEnd), 
+	// 2
+	BasicBlockEnd(prevEnd), 
+	// 3
+	BasicBlockBegin(nextBB), 
+	// 2, 3
+	IfElse(prevEnd, nextBB).
+
+
+.decl BBInFunc(insn: Insn, func: Function)
+.output BBInFunc
+
+BBInFunc(insn, func):-
+	BasicBlockBegin(insn),
+	_FuncInsn(func, insn).
+
+
+// Dominate relation within function scope 
+/**
+	A
+	| \
+	|  B
+	| /
+	C
+
+	A -> B
+	B -> C
+	A -> C
+**/
+
+
+.decl NotDominateBB(insn1: Insn, insn2: Insn)
+.output NotDominateBB
+
+// bb does not dominate start
+// B, A
+// C, A
+NotDominateBB(bb, start):- 
+    FuncEntry(func, start), 
+    BBInFunc(bb, func),
+    bb != start.
+
+// B, C | C, B
+NotDominateBB(next, bb):- 
+    NotDominateBB(bb, prev), // B, A | C, A
+    NextBasicBlock(prev, next), // A, C | A, B
+    next != bb. // for the loop
+
+.decl DominateBB(dom: Insn, insn: Insn)
+.output DominateBB
+
+// A, B
+// A, C
+DominateBB(dominator, bb):-
+	BBInFunc(dominator, func),
+	BBInFunc(bb, func),
+	dominator != bb,
+	!NotDominateBB(dominator, bb).
+
+
+// can be restricted to only when in query (e.g. require_auth and dbOps block)
+.decl ReachableInBB(insn1: Insn, insn2: Insn)
+.output ReachableInBB
+
+ReachableInBB(insn, insn):-
+	BasicBlockHead(_, insn).
+
+ReachableInBB(insn, next):-
+	ReachableInBB(insn, mid),
+	NextInSameBasicBlock(mid, next).
+
+
+
