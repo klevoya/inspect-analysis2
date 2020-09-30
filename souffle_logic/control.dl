@@ -13,10 +13,10 @@ FuncEntry(func, insn):-
 .decl IfElse(from: Insn, to: Insn)
 .output IfElse
 
+
 IfElse(if, to):-
-	_Jump(if, to, _);
-	_Else(if, to);
-	_FallThrough(if, to).
+	_Jump(if, to, _),
+	_IfCond(if, _, _).
 
 // begin of function, 
 BasicBlockBegin(insn):-
