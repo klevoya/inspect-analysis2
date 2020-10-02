@@ -7,3 +7,4 @@ logs/
 **.DS_Store
 database/
 benchmark/BancorX
+profile
