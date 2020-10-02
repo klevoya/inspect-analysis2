@@ -29,9 +29,21 @@ Three layers:
 .decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
 .output ActionFuncReachable
 
-ActionFuncReachable(from, to, insn):-
+/* 	
+	apply(){
+		mid();
+	}
+	mid(){
+		action1();
+		action2();
+		...
+	}
+
+*/
+ActionFuncReachable(mid, action, insn):-
 	_FuncCall(_, "apply", from),
-	_FuncCall(insn, from, to).
+	_FuncCall(_, from, mid),
+	_FuncCall(insn, mid, action).
 
 ActionFuncReachable(from, to, insn):-
 	ActionFuncReachable(from, mid, _),
@@ -247,13 +259,13 @@ AuthVarForDB(var, dbInsn):-
 
 /* Case:
 	Func1(){
-			1: require_auth (A) // Auth(A)
-			2: Func2(A)
-			3: Func2(B)
-		}
+		1: require_auth (A) // Auth(A)
+		2: Func2(A)
+		3: Func2(B)
+	}
 
-		Func2(C){
-			4: DbOps(C) // C -> A, C -> B
+	Func2(C){
+		4: DbOps(C) // C -> A, C -> B
 	}
 
 	Expect violation at 4
@@ -304,7 +316,7 @@ PayerInFunc(dbInsn, to, func):-
 
 // capture payer points to if payer is passed by parameters
 .decl PayerInFuncCallPointsTo(dbInsn: Insn, to: Var, funcCall: Insn)
-.output PayerInFunc
+.output PayerInFuncCallPointsTo
 
 PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	PayerInFunc(dbInsn, formalVar, func),
