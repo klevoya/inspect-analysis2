@@ -1,65 +1,18 @@
 #include "control.dl"
-
+#include "pointer.dl"
+/*
+Three layers:
+	Intra-procedural: only check if the DBOps are dominated by require_auth whithin same function
+	Inter-procedural: only check if require_auth dominate functions with DBOps (payer variables set mataching)
+	Flow sensitive: check if require_auth dominate the function call with the according payer varaible (ordered matching)
+*/
+	
 #define IntraProcedural 0
 #define FlowSensitive 1
 
-.decl RootVar(var: Var)
-.output RootVar
 
-RootVar(var):-
-	_AssignType(_, var, "Const").
-
-
-// No connection between Store/Load yet
-RootVar(var):-
-	_Load(_, _, _, var).
-
-
-// assume uncalled funcation is the entry point
-RootVar(var):-
-	_FormalArgs(_, func, _, var),
-	!_FuncCall(_, _, func).
-
-
-.decl CopyAssign(insn: Insn, to: Var, from: Var)
-.output CopyAssign
-
-CopyAssign(insn, to, from):-
-	_AssignVar(insn, to, from),
-	_AssignType(insn, to, "Copy").
-
-
-.decl VarPointsTo(var1: Var, var2: Var)
-.output VarPointsTo
-
-// For require_auth, the user should only come from apply(...) or get_self()
-// could restrict to use-def chain of require_auth and dbOps vars
-
-// root -> root
-VarPointsTo(var, var):-
-	RootVar(var).
-
-// var -> root
-VarPointsTo(to, from):-
-	CopyAssign(_, to, from),
-	RootVar(from).
-
-// Copys
-VarPointsTo(to, var):-
-	CopyAssign(_, to, from),
-	VarPointsTo(from, var).
-
-// argument mapping
-VarPointsTo(to, var):-
-	_ActualArgs(_, func, index, from),
-	_FormalArgs(_, func, index, to),
-	VarPointsTo(from, var).
-
-// return value mapping
-VarPointsTo(to, var):-
-	_FormalReturn(_, func, from),
-	_ActualReturn(_, func, to),
-	VarPointsTo(from, var).
+.init control = ControlFlow
+.init pointer = Pointer
 
 /* Auth Check */
 
@@ -94,7 +47,7 @@ func(){
 IntraAuthForDB(check, dbInsn):-
 	DBInsn(dbInsn, _),
 	_FuncCall(check, _, "require_auth"),
-	ReachableInBB(check, dbInsn).
+	control.ReachableInBB(check, dbInsn).
 
 /*
 func(){
@@ -109,9 +62,9 @@ func(){
 IntraAuthForDB(check, dbInsn):-
 	DBInsn(dbInsn, _),
 	_FuncCall(check, _, "require_auth"),
-	BasicBlockHead(dbHead, dbInsn),
-	BasicBlockHead(checkHead, check),
-	DominateBB(checkHead, dbHead). 
+	control.BasicBlockHead(dbHead, dbInsn),
+	control.BasicBlockHead(checkHead, check),
+	control.DominateBB(checkHead, dbHead). 
 
 
 .decl SafeDBOps(dbInsn: Insn)
@@ -122,8 +75,8 @@ SafeDBOps(dbInsn):-
 	IntraAuthForDB(check, dbInsn),
 	_ActualArgs(check, "require_auth", 0, authVar),
 	DBInsn(dbInsn, payerVar),
-	VarPointsTo(authVar, user),
-	VarPointsTo(payerVar, user).
+	pointer.VarPointsTo(authVar, user),
+	pointer.VarPointsTo(payerVar, user).
 
 // require_auth and DBOps are in different functions
 #ifndef IntraProcedural
@@ -151,6 +104,9 @@ PossibleViolation(insn):-
 	!SafeDBOps(insn).
 
 
+.decl AuthDomFunc(check: Insn, func: Function, funcCall: Insn)
+.output AuthDomFunc
+
 /*  Case 1:
 func1{
 	check();
@@ -161,23 +117,20 @@ func2(){
 }
 */
 
-.decl AuthDomFunc(check: Insn, func: Function, funcCall: Insn)
-.output AuthDomFunc
-
 // check, func2
 // different BB
 AuthDomFunc(checkCall, newFunc, funcCall):-
 	_FuncCall(checkCall, _, "require_auth"),
-	BasicBlockHead(checkHead, checkCall),
+	control.BasicBlockHead(checkHead, checkCall),
 	_FuncCall(funcCall, _, newFunc),
-	BasicBlockHead(funcHead, funcCall),
-	DominateBB(checkHead, funcHead).
+	control.BasicBlockHead(funcHead, funcCall),
+	control.DominateBB(checkHead, funcHead).
 
 // same BB
 AuthDomFunc(checkCall, newFunc, funcCall):-
 	_FuncCall(checkCall, _, "require_auth"),
 	_FuncCall(funcCall, _, newFunc),
-	ReachableInBB(checkCall, funcCall).
+	control.ReachableInBB(checkCall, funcCall).
 
 /* Case 2:
 func1{
@@ -198,16 +151,16 @@ InterAuthForDB(check, dbInsn):-
 	_FuncCall(check, fromFunc, "require_auth"),
 	_FuncCall(checkCall, _, fromFunc),
 	PossibleViolation(dbInsn),
-	BasicBlockHead(dbHead, dbInsn),
-	BasicBlockHead(checkHead, checkCall),
-	DominateBB(checkHead, dbHead).
+	control.BasicBlockHead(dbHead, dbInsn),
+	control.BasicBlockHead(checkHead, checkCall),
+	control.DominateBB(checkHead, dbHead).
 
 // same BB
 InterAuthForDB(check, dbInsn):-
 	_FuncCall(check, fromFunc, "require_auth"),
 	_FuncCall(checkCall, _, fromFunc),
 	PossibleViolation(dbInsn),
-	ReachableInBB(checkCall, dbInsn). 
+	control.ReachableInBB(checkCall, dbInsn). 
 
 /* Case 3:
 checkFunc{
@@ -229,9 +182,9 @@ AuthDomFunc(check, newFunc, newFuncCall):-
 	_FuncCall(check, checkFunc, "require_auth"),
 	_FuncCall(checkCall, fromFunc, checkFunc),
 	_FuncCall(newFuncCall, fromFunc, newFunc),
-	BasicBlockHead(newFuncHead, newFuncCall),
-	BasicBlockHead(checkHead, checkCall),
-	DominateBB(checkHead, newFuncHead).
+	control.BasicBlockHead(newFuncHead, newFuncCall),
+	control.BasicBlockHead(checkHead, checkCall),
+	control.DominateBB(checkHead, newFuncHead).
 
 
 // same BB
@@ -239,7 +192,7 @@ AuthDomFunc(check, newFunc, newFuncCall):-
 	_FuncCall(check, checkFunc, "require_auth"),
 	_FuncCall(checkCall, fromFunc, checkFunc),
 	_FuncCall(newFuncCall, fromFunc, newFunc),
-	ReachableInBB(checkCall, newFuncCall).
+	control.ReachableInBB(checkCall, newFuncCall).
 	
 // recursion, can be overlooked for performance
 AuthDomFunc(check, newFunc, newFuncCall):-
@@ -254,7 +207,7 @@ AuthDomFunc(check, newFunc, newFuncCall):-
 AuthVarForDB(var, dbInsn):-
 	AuthDomFunc(check, func, _),
 	_ActualArgs(check, "require_auth", 0, authVar),
-	VarPointsTo(authVar, var),
+	pointer.VarPointsTo(authVar, var),
 	PossibleViolation(dbInsn),
 	_FuncInsn(func, dbInsn).
 
@@ -262,10 +215,24 @@ AuthVarForDB(var, dbInsn):-
 AuthVarForDB(var, dbInsn):-
 	InterAuthForDB(check, dbInsn),
 	_ActualArgs(check, "require_auth", 0, authVar),
-	VarPointsTo(authVar, var).
+	pointer.VarPointsTo(authVar, var).
 
 
-// For missing some payer vars
+/* Case:
+	Func1(){
+			1: require_auth (A) // Auth(A)
+			2: Func2(A)
+			3: Func2(B)
+		}
+
+		Func2(C){
+			4: DbOps(C) // C -> A, C -> B
+	}
+
+	Expect violation at 4
+*/
+
+// If miss some payer auths 
 .decl Violation(insn: Insn)
 .output Violation
 
@@ -273,31 +240,31 @@ Violation(dbInsn):-
 	PossibleViolation(dbInsn),
 	!AuthVarForDB(to, dbInsn),
 	DBInsn(dbInsn, payer),
-	VarPointsTo(payer, to).
+	pointer.VarPointsTo(payer, to).
 
 
 /* Flow Sensitive rules*/
+#ifdef FlowSensitive
+
 /* Case
 	Func1(){
-		1: require_auth (B)
-		2: Func2(A)
-		3: require_auth (A)
-		4: Func2(B)
+		1: require_auth (B) // Auth(B)
+		2: Func2(A) // A
+		3: require_auth (A) // Auth(A)
+		4: Func2(B) // B
 	}
 	Func2(C){
-		5: Db_insn: Db_Store(C)
+		5: Db_insn: Db_Store(C) // C -> A, C -> B
 	}
 
 	Expect violation at 5
 */
 
-#ifdef FlowSensitive
 
 .decl PayerInFunc(dbInsn: Insn, payerVar: Var, func: Function)
 .output PayerInFunc
 
-
-// Function with direct call
+// payerVar in dbOps
 PayerInFunc(dbInsn, payerVar, func):-
 	PossibleViolation(dbInsn),
 	_FuncInsn(func, dbInsn),
@@ -306,7 +273,7 @@ PayerInFunc(dbInsn, payerVar, func):-
 // All the payer var within the function
 PayerInFunc(dbInsn, to, func):-
 	PayerInFunc(dbInsn, from, func),
-	CopyAssign(_, from, to).
+	pointer.IntraCopyAssign(_, from, to).
 
 // capture payer points to if payer is passed by parameters
 .decl PayerInFuncCallPointsTo(dbInsn: Insn, to: Var, funcCall: Insn)
@@ -316,14 +283,14 @@ PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	PayerInFunc(dbInsn, formalVar, func),
 	_FormalArgs(_, func, index, formalVar),
 	_ActualArgs(funcCall, func, index, actualVar),
-	VarPointsTo(actualVar, to).
+	pointer.VarPointsTo(actualVar, to).
 
 // For mixed order
 Violation(dbInsn):-
 	PayerInFuncCallPointsTo(dbInsn, to, funcCall),
 	!AuthDomFunc(check, _, funcCall),
 	_ActualArgs(check, "require_auth", 0, authVar),
-	VarPointsTo(authVar, to).
+	pointer.VarPointsTo(authVar, to).
 
 #endif
 

@@ -6,3 +6,4 @@ logs/
 **._*
 **.DS_Store
 database/
+benchmark/BancorX

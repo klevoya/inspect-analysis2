@@ -1,0 +1,96 @@
+#include "input.dl"
+// a = 0
+// b = 2
+// var1 = a + b
+// store(var1) 
+// c = 0
+// d = 2
+// var2 = c + d
+// load(var2) 
+
+
+// coarse grain, should work fine for intra-procedural
+.decl Variables(var: Var)
+.output Variables
+
+Variables(var):-
+	assignVar(_, _, var);
+	assignVar(_, var, _);
+	mload(_, _, _, var).
+
+.decl RootVar(var: Var)
+.output RootVar
+
+// also consider returned value, formal args and db_load.
+RootVar(var):-
+	Variables(var),
+	!assignVar(_, var, _),
+	!mload(_, _, _, var).
+
+.decl OtherVar(var: Var)
+.output OtherVar
+
+OtherVar(var):-
+	Variables(var),
+	!RootVar(var).
+
+.decl RootDependency(var: Var, other: Var)
+.output RootDependency
+
+RootDependency(var, root):-
+	assignVar(_, var, root),
+	RootVar(root).
+
+RootDependency(var, root):-
+	assignVar(_, var, other),
+	OtherVar(other),
+	RootDependency(other, root).
+
+
+.decl NoRootDep(var: Var, root: Var)
+.output NoRootDep
+
+NoRootDep(var, root):-
+	OtherVar(var),
+	!RootDependency(var, root),
+	RootVar(root).
+
+
+.decl NotAlias(var: Var, other: Var)
+.output NotAlias
+
+
+
+// can be done by functions
+NotAlias(var, var):-
+	OtherVar(var).
+
+NotAlias(var, other):-
+	OtherVar(var),
+	OtherVar(other),
+	RootDependency(var, root),
+	NoRootDep(other, root).
+
+NotAlias(var, other):-
+	NotAlias(other, var).
+
+.decl Alias(var: Var, other: Var)
+.output Alias
+	
+// could extend if the constant info is available
+// so that if the root var set is different but with 
+// same constant, it can also be considered as alias
+Alias(var, other):-
+	OtherVar(var),
+	OtherVar(other),
+	!NotAlias(var, other).
+
+// Also alias
+.decl MemMapping(to: Var, from: Var)
+.output MemMapping
+
+MemMapping(to, from):-
+	mstore(_, storeOffset, offset, from),
+	mload(_, loadOffset, offset, to),
+	Alias(storeOffset, loadOffset).
+

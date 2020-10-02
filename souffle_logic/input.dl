@@ -63,5 +63,5 @@ GET_REL_FROM_FILE(_FormalReturn, "must/fnDefinitionRtn.facts")
 .decl _ActualReturn   (callSite: Insn, func: Function, return: Var)
 GET_REL_FROM_FILE(_ActualReturn, "must/fnCallRtn.facts")
 
-.decl _IfCond(ifInsn:Insn, thenElse:Insn, cond:Var)
-GET_REL_FROM_FILE(_IfCond, "may/taint.facts")
+.decl _EndIf(ifInsn:Insn, endInsn:Insn)
+GET_REL_FROM_FILE(_EndIf, "must/endIf.facts")

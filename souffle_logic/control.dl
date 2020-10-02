@@ -1,8 +1,10 @@
 #include "input.dl"
 
+
+.comp ControlFlow{
+
 .decl FuncEntry(func: Function, firstInsn: Insn)
 .output FuncEntry
-
 
 FuncEntry(func, insn):-
 	_FormalArgs(insn, func, _, _).
@@ -16,7 +18,7 @@ FuncEntry(func, insn):-
 
 IfElse(if, to):-
 	_Jump(if, to, _),
-	_IfCond(if, _, _).
+	_EndIf(if, _).
 
 // begin of function, 
 BasicBlockBegin(insn):-
@@ -146,5 +148,5 @@ ReachableInBB(insn, next):-
 	ReachableInBB(insn, mid),
 	NextInSameBasicBlock(mid, next).
 
-
+}
 
