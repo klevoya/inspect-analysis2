@@ -21,12 +21,38 @@ Three layers:
 2. Not preceed by require_auth()
 */
 
+
+// DB Remove
+// Unlikely called without DB find
+// So only consider the find and remove that can be called from the same action
+
+.decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
+.output ActionFuncReachable
+
+ActionFuncReachable(from, to, insn):-
+	_FuncCall(_, "apply", from),
+	_FuncCall(insn, from, to).
+
+ActionFuncReachable(from, to, insn):-
+	ActionFuncReachable(from, mid, _),
+	_FuncCall(insn, mid, to).
+
+.decl DBRemove(insn: Insn, payer: Var)
+.output DBRemove
+
+DBRemove(removeInsn, payer):-
+	ActionFuncReachable(action, "db_remove_i64", removeInsn),
+	ActionFuncReachable(action, "db_find_i64", findInsn),
+	_ActualArgs(findInsn, _, 3, payer).
+
+
 .decl DBInsn(insn: Insn, payer: Var)
 .output DBInsn
 
 DBInsn(insn, payer):-
 	_DBStore(insn, _, payer, _, _);
-	_DBUpdate(insn, _, payer, _).
+	_DBUpdate(insn, _, payer, _);
+	DBRemove(insn, payer).
 
 
 // Assume auth check and db access are in the same function
@@ -102,6 +128,7 @@ Violation(insn):-
 PossibleViolation(insn):-
 	DBInsn(insn, _),
 	!SafeDBOps(insn).
+
 
 
 .decl AuthDomFunc(check: Insn, func: Function, funcCall: Insn)
