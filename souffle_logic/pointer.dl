@@ -11,7 +11,11 @@ RootVar(var):-
 	!_AssignType(_, var, "Copy"),
 	!_AssignType(_, var, "Call").
 
+// Global variable
 RootVar("$a").
+
+// Reciever
+RootVar("_self").
 
 // assume uncalled funcation is the entry point
 RootVar(var):-
