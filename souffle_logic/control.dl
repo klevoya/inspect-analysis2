@@ -1,7 +1,5 @@
 #include "input.dl"
-
-
-.comp ControlFlow{
+#include "CFGDom.dl"
 
 .decl FuncEntry(func: Function, firstInsn: Insn)
 .output FuncEntry
@@ -20,7 +18,7 @@ IfElse(if, to):-
 	_Jump(if, to, _),
 	_EndIf(if, _).
 
-// begin of function, 
+// begin of function,
 BasicBlockBegin(insn):-
 	FuncEntry(_, insn).
 
@@ -148,5 +146,4 @@ ReachableInBB(insn, next):-
 	ReachableInBB(insn, mid),
 	NextInSameBasicBlock(mid, next).
 
-}
 

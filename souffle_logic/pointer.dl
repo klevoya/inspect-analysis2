@@ -1,4 +1,6 @@
-.comp Pointer{
+#include "control.dl"
+
+.comp Pointer {
 
 .decl RootVar(var: Var)
 .output RootVar
@@ -9,6 +11,7 @@ RootVar(var):-
 	!_AssignType(_, var, "Copy"),
 	!_AssignType(_, var, "Call").
 
+RootVar("$a").
 
 // assume uncalled funcation is the entry point
 RootVar(var):-
@@ -22,11 +25,16 @@ RootVar(var):-
 
 IntraCopyAssign(insn, to, from):-
 	_AssignVar(insn, to, from),
-	_AssignType(insn, to, "Copy").
+	_AssignType(insn, to, "Copy"),
+	to != "$a".
 
 // load mapping, very crude but enough for checking alias
 IntraCopyAssign(insn, to, from):-
 	_Load(insn, from, _, to).
+
+// IntraCopyAssign(insn, to, from):-
+// 	_Load(insn, _, _, to),
+// 	StoreLoadMap(to, from).
 
 
 // copys include mapping through parameters and return values
@@ -63,4 +71,138 @@ VarPointsTo(to, var):-
 	VarPointsTo(from, var).
 
 
+/* Offset PointsTo  (Problem: Multiple Stores )
+
+// adding operands on top of var points to
+.decl _OffSetPointsTo(var: Var, to: Var)
+.output _OffSetPointsTo
+
+// to = $a
+.decl OffSetPointsTo(var: Var, to: Var)
+.output OffSetPointsTo
+
+
+// base load/store index
+_OffSetPointsTo(var, to):-
+	(_Load(_, var, _, _);
+	_Store(_, var, _, _)),
+	VarPointsTo(var, to).
+
+// add operand
+_OffSetPointsTo(var, op):-
+	_OffSetPointsTo(var, mid),
+	_AssignVar(insn, mid, op),
+	(_AssignType(insn, mid, "Add");
+	_AssignType(insn, mid, "Sub")).
+
+//add operand pointsTo
+_OffSetPointsTo(var, to):-
+	_OffSetPointsTo(var, op),
+	VarPointsTo(op, to).
+
+// // connect loads
+// _OffSetPointsTo(loadTo, to):-
+// 	_OffSetPointsTo(offset, to),
+// 	_Load(_, offset, _, mid),
+// 	_Load(_, mid, _, loadTo).
+
+OffSetPointsTo(var, to):-
+	_OffSetPointsTo(var, to),
+	_AssignVar(_, to, "$a").
+
+.decl StoreLoadMap(to: Var, from: Var)
+.output StoreLoadMap
+
+StoreLoadMap(to, from):-
+	_Store(_, storeOffset, _, from),
+	_Load(_, loadOffset, _, to),
+	OffSetPointsTo(storeOffset, var),
+	OffSetPointsTo(loadOffset, var).
+*/
+
+
+
+// inlcuding arithmetic operations
+
+.decl ExtendedRootVar(var: Var)
+// .output ExtendedRootVar
+
+ExtendedRootVar(var):-
+	RootVar(var),
+	!_AssignType(_, var, "Add"),
+	!_AssignType(_, var, "Sub").
+
+
+.decl ExtendedCopyAssign(to: Var, from: Var)
+// .output ExtendedCopyAssign
+
+ExtendedCopyAssign(to, from):-
+	InterCopyAssign(to, from).
+
+ExtendedCopyAssign(to, from):-
+	_AssignVar(insn, to, from),
+	(_AssignType(insn, to, "Add");
+	_AssignType(insn, to, "Sub")).
+
+
+.decl ExtendedVarPointsTo(var: Var, to: Var)
+.output ExtendedVarPointsTo
+
+// root -> root
+ExtendedVarPointsTo(var, var):-
+	ExtendedRootVar(var).
+
+// Copys
+ExtendedVarPointsTo(to, var):-
+	ExtendedCopyAssign(to, from),
+	ExtendedVarPointsTo(from, var).
+
+
+// Taint self(reciever)
+.decl Self(var: Var)
+.output Self
+
+Self(var):-
+	_FormalArgs(_, "apply", 0, var).
+
+Self(var):-
+	ExtendedVarPointsTo(var, self),
+	Self(self).
+
+
+// offset with store self insn
+.decl StoreSelf(insn: Insn, offset: Var)
+.output StoreSelf
+
+StoreSelf(insn, offset):-
+	_Store(insn, offset, _, var),
+	Self(var).
+
+.decl StoreLoadSelf(storeInsn: Insn, loadInsn: Insn, loadTo: Var)
+.output StoreLoadSelf
+
+// Load from store self by matching offsets
+StoreLoadSelf(storeInsn, loadInsn, loadTo):-
+	StoreSelf(storeInsn, storeOffset),
+	_Load(loadInsn, loadOffset, _, loadTo),
+	ExtendedVarPointsTo(storeOffset, to),
+	ExtendedVarPointsTo(loadOffset, to).
+
+// reachable from store to load
+.init store_dom_load = CFGDom
+
+store_dom_load.Src(insn):-
+	StoreSelf(insn, _).
+
+store_dom_load.Target (insn):-
+	StoreLoadSelf(_, insn, _).
+
+
+Self(var):-
+	StoreLoadSelf(store, load, var),
+	(store_dom_load.IntraSrcDomTarget(store, load);
+	store_dom_load.InterSrcDomTarget(store, load)).
+
+VarPointsTo(var, "_self"):-
+	Self(var).
 }
