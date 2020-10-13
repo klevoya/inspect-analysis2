@@ -32,5 +32,14 @@ public:
         new_user.display_name = display_name;
       });
     }
-  }
+
+    if(!has_auth(_self)){
+      require_auth(_self)
+    }
+    
+    _users.emplace(_self, [&](auto &new_user) {
+        new_user.username = username;
+        new_user.display_name = display_name;
+      });
+    }
 };

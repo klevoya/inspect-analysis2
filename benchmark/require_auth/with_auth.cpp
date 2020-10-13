@@ -1,4 +1,4 @@
-#include <eosio/eosio.hpp>
+3#include <eosio/eosio.hpp>
 #include <eosio/asset.hpp>
 
 using namespace eosio;
@@ -16,6 +16,9 @@ class WithAuth : public contract {
           row.key = user;
           row.balance = quantity;
         });
+        
+        auto itr = people.find(user.value);
+        people.erase( itr );
       }
   private:
   	  struct [[eosio::table]] person {

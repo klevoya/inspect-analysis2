@@ -36,11 +36,6 @@ IntraCopyAssign(insn, to, from):-
 IntraCopyAssign(insn, to, from):-
 	_Load(insn, from, _, to).
 
-// IntraCopyAssign(insn, to, from):-
-// 	_Load(insn, _, _, to),
-// 	StoreLoadMap(to, from).
-
-
 // copys include mapping through parameters and return values
 .decl InterCopyAssign(to: Var, from: Var)
 .output InterCopyAssign
@@ -74,6 +69,13 @@ VarPointsTo(to, var):-
 	InterCopyAssign(to, from),
 	VarPointsTo(from, var).
 
+// obj.f1(name) = var2
+// obj.f2 = var3
+
+// store(offset2) = var2
+// store(offset3) = var3
+// var = load(offset) (self)
+// dbOp(var)
 
 /* Offset PointsTo  (Problem: Multiple Stores )
 
@@ -122,6 +124,11 @@ StoreLoadMap(to, from):-
 	_Load(_, loadOffset, _, to),
 	OffSetPointsTo(storeOffset, var),
 	OffSetPointsTo(loadOffset, var).
+
+IntraCopyAssign(insn, to, from):-
+ 	_Load(insn, _, _, to),
+ 	StoreLoadMap(to, from).
+
 */
 
 

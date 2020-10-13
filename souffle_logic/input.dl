@@ -20,6 +20,9 @@ GET_REL_FROM_FILE(_AssignVar, "must/assignVar.facts")
 .decl _AssignType(insn: Insn, to: Var, type: symbol)      
 GET_REL_FROM_FILE(_AssignType, "must/assignType.facts")
 
+.decl _SimpleAssign(insn: Insn, to: Var, num: symbol)
+GET_REL_FROM_FILE(_SimpleAssign, "must/simpleAssign.facts")
+
 .decl _Load(insn: Insn, dynOffset: Var, memargOffset: number, to: Var)
 GET_REL_FROM_FILE(_Load, "must/mload.facts")
 
@@ -65,3 +68,5 @@ GET_REL_FROM_FILE(_ActualReturn, "must/fnCallRtn.facts")
 
 .decl _EndIf(ifInsn:Insn, endInsn:Insn)
 GET_REL_FROM_FILE(_EndIf, "must/endIf.facts")
+
+

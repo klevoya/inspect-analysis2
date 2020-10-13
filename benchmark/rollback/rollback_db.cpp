@@ -19,9 +19,6 @@ class Rollback : public contract {
           row.balance = quantity;
         });
 
-        auto itr = people.find(from.value);
-        people.erase( itr );
-
         action(
            permission_level{get_self(), "active"_n},
            "eosio.token"_n, "transfer"_n,

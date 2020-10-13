@@ -11,17 +11,6 @@ class Rollback : public contract {
       [[eosio::on_notify("eosio.token::transfer")]] 
       void playgame(name from, name to, asset quantity, std::string memo) {
 
-        people_index people(get_first_receiver(), get_first_receiver().value);
-
-        require_auth(_self);
-        people.emplace(_self, [&]( auto& row ) {
-          row.key = _self;
-          row.balance = quantity;
-        });
-
-        auto itr = people.find(from.value);
-        people.erase( itr );
-
         action(
            permission_level{get_self(), "active"_n},
            "eosio.token"_n, "transfer"_n,
@@ -29,14 +18,6 @@ class Rollback : public contract {
           ).send();
 
       }
-
-  private:
-    struct [[eosio::table]] person {
-      name key;
-      asset balance;
-      uint64_t primary_key() const { return key.value; }
-    };
-    using people_index = eosio::multi_index<"people"_n, person>;
 
 };
 

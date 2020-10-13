@@ -1,4 +1,4 @@
-#include "pointer.dl"
+
 /*
 Three layers:
 	Intra-procedural: only check if the DBOps are dominated by require_auth whithin same function
@@ -12,8 +12,8 @@ Three layers:
 
 /* Auth Check */
 
-.decl Violation(insn: Insn)
-.output Violation
+.decl AuthViolation(insn: Insn)
+.output AuthViolation
 
 /* Violation: 
 1. DB Insn
@@ -55,8 +55,6 @@ DBRemove(removeInsn, payer):-
 	ActionFuncReachable(action, "db_remove_i64", removeInsn),
 	ActionFuncReachable(action, "db_find_i64", findInsn),
 	_ActualArgs(findInsn, _, 3, payer).
-
-
 
 
 .decl _DBInsn(insn: Insn, payer: Var)
@@ -102,10 +100,10 @@ SafeIntraDBOps(dbInsn):-
 	pointer.VarPointsTo(payerVar, user).
 
 // Result obtianed from  intra-procedrual analysis
-.decl PossibleViolation(insn: Insn)
-.output PossibleViolation
+.decl PossibleAuthViolation(insn: Insn)
+.output PossibleAuthViolation
 
-PossibleViolation(insn):-
+PossibleAuthViolation(insn):-
 	DBInsn(insn, _),
 	!SafeIntraDBOps(insn).
 
@@ -138,8 +136,8 @@ AuthVarForDB(check, var, dbInsn):-
 
 // If miss some payer auths 
 
-Violation(dbInsn):-
-	PossibleViolation(dbInsn),
+AuthViolation(dbInsn):-
+	PossibleAuthViolation(dbInsn),
 	!AuthVarForDB(_, to, dbInsn),
 	DBInsn(dbInsn, payer),
 	pointer.VarPointsTo(payer, to).
@@ -168,7 +166,7 @@ Violation(dbInsn):-
 
 // payerVar in dbOps
 PayerInFunc(dbInsn, payerVar, func):-
-	PossibleViolation(dbInsn),
+	PossibleAuthViolation(dbInsn),
 	_FuncInsn(func, dbInsn),
 	DBInsn(dbInsn, payerVar).
 
@@ -188,7 +186,7 @@ PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	pointer.VarPointsTo(actualVar, to).
 
 // For mixed order
-Violation(dbInsn):-
+AuthViolation(dbInsn):-
 	PayerInFuncCallPointsTo(dbInsn, to, funcCall),
 	!auth_dom_db.SrcDomFunc(check, _, funcCall),
 	_ActualArgs(check, "require_auth", 0, authVar),
