@@ -1,11 +1,20 @@
 .comp CFGDom{
+
+	#if DEBUG
+		.output IntraSrcDomTarget
+		.output InterSrcDomTarget
+		.output SrcDomFunc
+		.output MustSrcInFunc
+	#endif
+
+	
 	.decl Src(insn: Insn)
 	.decl Target(insn: Insn)
 
 	/**** Intra procedural ****/
 
 	.decl IntraSrcDomTarget(src: Insn, target: Insn)
-	.output IntraSrcDomTarget
+	
 
 	/*
 	func(){
@@ -43,11 +52,21 @@
 
 
 	/**** Inter procedural ****/
+	// must analysis
+	// for any target(may), a src(must) dominate the target
 	.decl InterSrcDomTarget(src: Insn, target: Insn)
-	.output InterSrcDomTarget
+
+	// find all functions where src is always executed within the function
+	.decl MustSrcInFunc(func: Function)
+
+	MustSrcInFunc(func):-
+		Src(src),
+		_FuncInsn(func, src),
+		BasicBlockHead(srcHead, src),
+		LastBB(last, func), // only considering one exit atm
+		DominateBB(srcHead, last).
 
 	.decl SrcDomFunc(src: Insn, func: Function, funcCall: Insn)
-	.output SrcDomFunc
 
 	/*  Case 1:
 	func1{
@@ -76,10 +95,10 @@
 
 	/* Case 2:
 	func1{
-		src
+		src // if src is alawys executed in the function
 	}
 	func2{
-		func1();
+		func1(); 
 		target;
 		....
 	}
@@ -89,6 +108,7 @@
 	InterSrcDomTarget(src, target):-
 		Src(src),
 		_FuncInsn(func, src),
+		MustSrcInFunc(func),
 		_FuncCall(srcCall, _, func),
 		Target(target),
 		BasicBlockHead(targetHead, target),
@@ -99,20 +119,21 @@
 	InterSrcDomTarget(src, target):-
 		Src(src),
 		_FuncInsn(func, src),
+		MustSrcInFunc(func),
 		_FuncCall(srcCall, _, func),
 		Target(target),
 		ReachableInBB(srcCall, target). 
 
 	/* Case 3:
 	srcFunc{
-		src;
+		src; // if src is alawys executed in the function
 	}
 	fromFunc{
-		srcFunc();
+		srcFunc(); 
 		newFunc();
 	}
 	newFunc(){
-		target;
+		target; // may executed
 	}
 	*/
 
@@ -122,6 +143,7 @@
 	SrcDomFunc(src, newFunc, newFuncCall):-
 		Src(src),
 		_FuncInsn(srcfunc, src),
+		MustSrcInFunc(srcfunc),
 		_FuncCall(srcCall, fromFunc, srcfunc),
 		_FuncCall(newFuncCall, fromFunc, newFunc),
 		BasicBlockHead(newFuncHead, newFuncCall),
@@ -133,6 +155,7 @@
 	SrcDomFunc(src, newFunc, newFuncCall):-
 		Src(src),
 		_FuncInsn(srcfunc, src),
+		MustSrcInFunc(srcfunc),
 		_FuncCall(srcCall, fromFunc, srcfunc),
 		_FuncCall(newFuncCall, fromFunc, newFunc),
 		ReachableInBB(srcCall, newFuncCall).

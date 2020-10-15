@@ -5,15 +5,26 @@ Three layers:
 	Inter-procedural: only check if require_auth dominate functions with DBOps (payer variables set mataching)
 	Flow sensitive: check if require_auth dominate the function call with the according payer varaible (ordered matching)
 */
-	
-#define FlowSensitive 1
+
+#if DEBUG
+	.output ActionFuncReachable
+	.output DBRemove
+	.output DBInsn
+	.output SafeIntraDBOps
+	.output PossibleAuthViolation
+	.output AuthVarForDB
+	.output PayerInFunc
+	.output PayerInFuncCallPointsTo
+#endif
+
+.output AuthViolation
+
 
 .init pointer = Pointer
 
 /* Auth Check */
 
 .decl AuthViolation(insn: Insn)
-.output AuthViolation
 
 /* Violation: 
 1. DB Insn
@@ -24,9 +35,7 @@ Three layers:
 // DB Remove
 // Unlikely called without DB find
 // So only consider the find and remove that can be called from the same action
-
 .decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
-.output ActionFuncReachable
 
 /* 	
 	apply(){
@@ -48,13 +57,15 @@ ActionFuncReachable(from, to, insn):-
 	ActionFuncReachable(from, mid, _),
 	_FuncCall(insn, mid, to).
 
+
+
 .decl DBRemove(insn: Insn, payer: Var)
-.output DBRemove
 
 DBRemove(removeInsn, payer):-
 	ActionFuncReachable(action, "db_remove_i64", removeInsn),
 	ActionFuncReachable(action, "db_find_i64", findInsn),
 	_ActualArgs(findInsn, _, 3, payer).
+
 
 
 .decl _DBInsn(insn: Insn, payer: Var)
@@ -64,8 +75,8 @@ _DBInsn(insn, payer):-
 	_DBUpdate(insn, _, payer, _);
 	DBRemove(insn, payer).
 
+
 .decl DBInsn(insn: Insn, payer: Var)
-.output DBInsn
 
 // if db op on self
 DBInsn(insn, "_self"):-
@@ -77,6 +88,7 @@ DBInsn(insn, payer):-
 	!pointer.Self(payer).
 
 
+
 // Auth dom dbop wihtin CFG
 .init auth_dom_db = CFGDom
 
@@ -86,10 +98,11 @@ auth_dom_db.Src(check):-
 auth_dom_db.Target(target):-
 	DBInsn(target, _).
 
+
+
 /* Intra-procedural rules*/
 
 .decl SafeIntraDBOps(dbInsn: Insn)
-.output SafeIntraDBOps
 
 // only safe if the users are the same in both instructions
 SafeIntraDBOps(dbInsn):-
@@ -99,9 +112,10 @@ SafeIntraDBOps(dbInsn):-
 	pointer.VarPointsTo(authVar, user),
 	pointer.VarPointsTo(payerVar, user).
 
+
+
 // Result obtianed from  intra-procedrual analysis
 .decl PossibleAuthViolation(insn: Insn)
-.output PossibleAuthViolation
 
 PossibleAuthViolation(insn):-
 	DBInsn(insn, _),
@@ -112,7 +126,6 @@ PossibleAuthViolation(insn):-
 /* Inter-procedural rules*/
 
 .decl AuthVarForDB(authInsn: Insn, var: Var, dbInsn: Insn)
-.output AuthVarForDB
 
 AuthVarForDB(check, var, dbInsn):-
 	auth_dom_db.InterSrcDomTarget(check, dbInsn),
@@ -144,7 +157,6 @@ AuthViolation(dbInsn):-
 
 
 /* Flow Sensitive rules*/
-#ifdef FlowSensitive
 
 /* Case
 	Func1(){
@@ -162,7 +174,6 @@ AuthViolation(dbInsn):-
 
 
 .decl PayerInFunc(dbInsn: Insn, payerVar: Var, func: Function)
-.output PayerInFunc
 
 // payerVar in dbOps
 PayerInFunc(dbInsn, payerVar, func):-
@@ -177,7 +188,6 @@ PayerInFunc(dbInsn, to, func):-
 
 // capture payer points to if payer is passed by parameters
 .decl PayerInFuncCallPointsTo(dbInsn: Insn, to: Var, funcCall: Insn)
-.output PayerInFuncCallPointsTo
 
 PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	PayerInFunc(dbInsn, formalVar, func),
@@ -191,7 +201,5 @@ AuthViolation(dbInsn):-
 	!auth_dom_db.SrcDomFunc(check, _, funcCall),
 	_ActualArgs(check, "require_auth", 0, authVar),
 	pointer.VarPointsTo(authVar, to).
-
-#endif
 
 

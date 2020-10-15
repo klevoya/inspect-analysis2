@@ -1,5 +1,0 @@
-.decl FakeTokenViolation(insn: Insn)
-.output FakeTokenViolation
-
-
-FakeTokenViolation("A").

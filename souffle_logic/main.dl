@@ -1,5 +1,6 @@
-#include "pointer.dl"
+#define DEBUG 0
 
+#include "pointer.dl"
 
 // Patterns
 #include "patterns/auth.dl"

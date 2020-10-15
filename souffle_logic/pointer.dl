@@ -2,8 +2,21 @@
 
 .comp Pointer {
 
+#if DEBUG
+	.output RootVar
+	.output IntraCopyAssign
+	.output InterCopyAssign
+	.output VarPointsTo
+	// .output ExtendedRootVar
+	// .output ExtendedCopyAssign
+	.output ExtendedVarPointsTo
+	.output Self
+	.output StoreSelf
+	.output StoreLoadSelf
+#endif
+
+
 .decl RootVar(var: Var)
-.output RootVar
 
 // Root Var includes const, arithmetic result and entry point parameters
 RootVar(var):-
@@ -23,9 +36,9 @@ RootVar(var):-
 	!_FuncCall(_, _, func).
 
 
+
 // copys wihtin function
 .decl IntraCopyAssign(insn: Insn, to: Var, from: Var)
-.output IntraCopyAssign
 
 IntraCopyAssign(insn, to, from):-
 	_AssignVar(insn, to, from),
@@ -36,9 +49,10 @@ IntraCopyAssign(insn, to, from):-
 IntraCopyAssign(insn, to, from):-
 	_Load(insn, from, _, to).
 
+
+
 // copys include mapping through parameters and return values
 .decl InterCopyAssign(to: Var, from: Var)
-.output InterCopyAssign
 
 InterCopyAssign(to, from):-
 	IntraCopyAssign(_, to, from).
@@ -54,8 +68,9 @@ InterCopyAssign(to, from):-
 	_ActualReturn(_, func, to).
 
 
+
+
 .decl VarPointsTo(var1: Var, var2: Var)
-.output VarPointsTo
 
 // For require_auth, the user should only come from apply(...) or get_self()
 // could restrict to use-def chain of require_auth and dbOps vars
@@ -69,74 +84,11 @@ VarPointsTo(to, var):-
 	InterCopyAssign(to, from),
 	VarPointsTo(from, var).
 
-// obj.f1(name) = var2
-// obj.f2 = var3
-
-// store(offset2) = var2
-// store(offset3) = var3
-// var = load(offset) (self)
-// dbOp(var)
-
-/* Offset PointsTo  (Problem: Multiple Stores )
-
-// adding operands on top of var points to
-.decl _OffSetPointsTo(var: Var, to: Var)
-.output _OffSetPointsTo
-
-// to = $a
-.decl OffSetPointsTo(var: Var, to: Var)
-.output OffSetPointsTo
-
-
-// base load/store index
-_OffSetPointsTo(var, to):-
-	(_Load(_, var, _, _);
-	_Store(_, var, _, _)),
-	VarPointsTo(var, to).
-
-// add operand
-_OffSetPointsTo(var, op):-
-	_OffSetPointsTo(var, mid),
-	_AssignVar(insn, mid, op),
-	(_AssignType(insn, mid, "Add");
-	_AssignType(insn, mid, "Sub")).
-
-//add operand pointsTo
-_OffSetPointsTo(var, to):-
-	_OffSetPointsTo(var, op),
-	VarPointsTo(op, to).
-
-// // connect loads
-// _OffSetPointsTo(loadTo, to):-
-// 	_OffSetPointsTo(offset, to),
-// 	_Load(_, offset, _, mid),
-// 	_Load(_, mid, _, loadTo).
-
-OffSetPointsTo(var, to):-
-	_OffSetPointsTo(var, to),
-	_AssignVar(_, to, "$a").
-
-.decl StoreLoadMap(to: Var, from: Var)
-.output StoreLoadMap
-
-StoreLoadMap(to, from):-
-	_Store(_, storeOffset, _, from),
-	_Load(_, loadOffset, _, to),
-	OffSetPointsTo(storeOffset, var),
-	OffSetPointsTo(loadOffset, var).
-
-IntraCopyAssign(insn, to, from):-
- 	_Load(insn, _, _, to),
- 	StoreLoadMap(to, from).
-
-*/
 
 
 
 // inlcuding arithmetic operations
-
 .decl ExtendedRootVar(var: Var)
-// .output ExtendedRootVar
 
 ExtendedRootVar(var):-
 	RootVar(var),
@@ -144,8 +96,8 @@ ExtendedRootVar(var):-
 	!_AssignType(_, var, "Sub").
 
 
+
 .decl ExtendedCopyAssign(to: Var, from: Var)
-// .output ExtendedCopyAssign
 
 ExtendedCopyAssign(to, from):-
 	InterCopyAssign(to, from).
@@ -156,8 +108,8 @@ ExtendedCopyAssign(to, from):-
 	_AssignType(insn, to, "Sub")).
 
 
+
 .decl ExtendedVarPointsTo(var: Var, to: Var)
-.output ExtendedVarPointsTo
 
 // root -> root
 ExtendedVarPointsTo(var, var):-
@@ -169,9 +121,9 @@ ExtendedVarPointsTo(to, var):-
 	ExtendedVarPointsTo(from, var).
 
 
+
 // Taint self(reciever)
 .decl Self(var: Var)
-.output Self
 
 Self(var):-
 	_FormalArgs(_, "apply", 0, var).
@@ -181,16 +133,17 @@ Self(var):-
 	Self(self).
 
 
+
 // offset with store self insn
 .decl StoreSelf(insn: Insn, offset: Var)
-.output StoreSelf
 
 StoreSelf(insn, offset):-
 	_Store(insn, offset, _, var),
 	Self(var).
 
+
+
 .decl StoreLoadSelf(storeInsn: Insn, loadInsn: Insn, loadTo: Var)
-.output StoreLoadSelf
 
 // Load from store self by matching offsets
 StoreLoadSelf(storeInsn, loadInsn, loadTo):-
@@ -198,6 +151,8 @@ StoreLoadSelf(storeInsn, loadInsn, loadTo):-
 	_Load(loadInsn, loadOffset, _, loadTo),
 	ExtendedVarPointsTo(storeOffset, to),
 	ExtendedVarPointsTo(loadOffset, to).
+
+
 
 // reachable from store to load
 .init store_dom_load = CFGDom
@@ -207,6 +162,8 @@ store_dom_load.Src(insn):-
 
 store_dom_load.Target (insn):-
 	StoreLoadSelf(_, insn, _).
+
+
 
 
 Self(var):-

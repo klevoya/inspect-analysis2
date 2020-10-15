@@ -1,22 +1,70 @@
 #include "input.dl"
 #include "CFGDom.dl"
 
+#if DEBUG
+	.output IfElse
+	.output Merge
+	.output FuncEntry
+	.output BasicBlockBegin
+	.output NextInSameBasicBlock
+	.output BasicBlockHead
+	.output BBInFunc
+	.output BasicBlockEnd
+	.output NextBasicBlock
+	.output LastBB
+	.output NotDominateBB
+	.output DominateBB
+	.output ReachableInBB
+#endif
+
+// Filtered follows without dead path(e.g. follows after br)
+.decl Follows(prev: Insn, to: Insn)
+
+Follows(prev, to):-
+	_Follows(prev, to),
+	!_Goto(prev, _),
+	!_BranchTable(prev, _, _).
+
+
+
+.decl IfElse(from: Insn, to: Insn)
+
+// cond
+IfElse(if, to):-
+	_Branch(if, to, _, _);
+	_Branch(if, _, to, _).
+
+// table
+IfElse(if, to):-
+	_BranchTable(if, to, _).
+
+
+
+.decl Merge(merge: Insn)
+
+// uncond
+Merge(merge):-
+	_Goto(_, merge).
+
+//cond
+Merge(merge):-
+	_EndIf(_, merge).
+
+// table merge
+Merge(merge):-
+	_BranchTable(_, merge, _).
+
+
+
+// function defintion
 .decl FuncEntry(func: Function, firstInsn: Insn)
-.output FuncEntry
 
 FuncEntry(func, insn):-
 	_FormalArgs(insn, func, _, _).
 
+
+
 .decl BasicBlockBegin(begin: Insn)
-.output BasicBlockBegin
-
-.decl IfElse(from: Insn, to: Insn)
-.output IfElse
-
-
-IfElse(if, to):-
-	_Jump(if, to, _),
-	_EndIf(if, _).
 
 // begin of function,
 BasicBlockBegin(insn):-
@@ -26,23 +74,26 @@ BasicBlockBegin(insn):-
 BasicBlockBegin(insn):-
 	IfElse(_, insn).
 
+// Merge block
+BasicBlockBegin(insn):-
+	Merge(insn).
+
+
 
 .decl NextInSameBasicBlock(insn: Insn, next: Insn)
-.output NextInSameBasicBlock
 
 // BB: 1 -> 2 -> 3
 
 // 1, 2
 // 2, 3
 NextInSameBasicBlock(insn, next):-
-	_Follows(insn, next),
-	!BasicBlockBegin(next). // not sure if needed ?
+	Follows(insn, next),
+	!BasicBlockBegin(next).
+
 
 
 // insn belongs to a basic block with head 
 .decl BasicBlockHead(head: Insn, insn: Insn)
-.output BasicBlockHead
-
 
 // 1, 1
 // 1, 2
@@ -54,8 +105,9 @@ BasicBlockHead(head, next) :-
    BasicBlockHead(head, insn),
    NextInSameBasicBlock(insn, next).
 
+
+
 .decl BasicBlockEnd(end: Insn)
-.output BasicBlockEnd
 
 // 3
 BasicBlockEnd(end):-
@@ -63,9 +115,8 @@ BasicBlockEnd(end):-
 	!NextInSameBasicBlock(end, _).
 
 
-.decl NextBasicBlock(prev: Insn, next: Insn)
-.output NextBasicBlock
 
+.decl NextBasicBlock(prev: Insn, next: Insn)
 
 // Assuming If/Else is the only the only control transfer in a function
 // Constructing CFG of basic blocks
@@ -83,13 +134,37 @@ NextBasicBlock(prevBB, nextBB):-
 	// 2, 3
 	IfElse(prevEnd, nextBB).
 
+// merge point
+// 1 -> 2 -> 5
+// 1 -> 3 -> 5
+NextBasicBlock(prevBB, nextBB):-
+	// 5
+	Merge(nextBB), 
+	// 2 | 3
+	BasicBlockEnd(prevEnd),
+	BasicBlockHead(prevBB, prevEnd),
+	// 2, 5 | 3, 5
+	(Follows(prevEnd, nextBB);
+	_Goto(prevEnd, nextBB);
+	_Branch(_, prevEnd, nextBB, _);
+	_BranchTable(prevEnd, nextBB, _)).
+
+
 
 .decl BBInFunc(insn: Insn, func: Function)
-.output BBInFunc
 
 BBInFunc(insn, func):-
 	BasicBlockBegin(insn),
 	_FuncInsn(func, insn).
+
+
+
+.decl LastBB(bb: Insn, func: Function)
+
+LastBB(bb, func):-
+	BBInFunc(bb, func),
+	!NextBasicBlock(bb, _).
+
 
 
 // Dominate relation within function scope 
@@ -107,24 +182,24 @@ BBInFunc(insn, func):-
 
 
 .decl NotDominateBB(insn1: Insn, insn2: Insn)
-.output NotDominateBB
 
 // bb does not dominate start
-// B, A
-// C, A
-NotDominateBB(bb, start):- 
+// A, B
+// A, C
+NotDominateBB(start, bb):- 
     FuncEntry(func, start), 
     BBInFunc(bb, func),
     bb != start.
 
 // B, C | C, B
 NotDominateBB(next, bb):- 
-    NotDominateBB(bb, prev), // B, A | C, A
+    NotDominateBB(prev, bb), // A, B | A, C
     NextBasicBlock(prev, next), // A, C | A, B
     next != bb. // for the loop
 
+
+
 .decl DominateBB(dom: Insn, insn: Insn)
-.output DominateBB
 
 // A, B
 // A, C
@@ -132,12 +207,12 @@ DominateBB(dominator, bb):-
 	BBInFunc(dominator, func),
 	BBInFunc(bb, func),
 	dominator != bb,
-	!NotDominateBB(dominator, bb).
+	!NotDominateBB(bb, dominator).
+
 
 
 // can be restricted to only when in query (e.g. require_auth and dbOps block)
 .decl ReachableInBB(insn1: Insn, insn2: Insn)
-.output ReachableInBB
 
 ReachableInBB(insn, insn):-
 	BasicBlockHead(_, insn).

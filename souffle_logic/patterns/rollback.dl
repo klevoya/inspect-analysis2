@@ -1,5 +1,13 @@
+#if DEBUG
+	.output PossibleRollback
+	.output InlineContract
+#endif
+
+.output RollbackViolation
+
+
+
 .decl PossibleRollback(sendInsn: Insn, contract: Var)
-.output PossibleRollback
 
 // actions with both send_inline and dbOps
 PossibleRollback(sendInsn, contract):-
@@ -9,8 +17,8 @@ PossibleRollback(sendInsn, contract):-
 	ActionFuncReachable(action, _, dbInsn).
 	
 
+
 .decl InlineContract(sendInsn: Insn, name: Var)
-.output InlineContract
 
 InlineContract(sendInsn, name):-
 	PossibleRollback(sendInsn, contract),
@@ -18,8 +26,9 @@ InlineContract(sendInsn, name):-
 	_Store(_, offset, 72, name), // contract name
 	pointer.VarPointsTo(offset, obj).
 	
+
+
 .decl RollbackViolation(insn: Insn)
-.output RollbackViolation
 
 RollbackViolation(insn):-
 	InlineContract(insn, name),
