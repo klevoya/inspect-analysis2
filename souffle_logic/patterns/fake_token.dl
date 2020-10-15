@@ -1,0 +1,35 @@
+#if DEBUG
+	.output CheckTransfer
+	.output CheckEOSIO
+	.output OnTransferAction
+	.output PossibleFakeToken
+#endif
+
+.decl CheckTransfer(insn: Insn, toBranch: Insn)
+
+CheckTransfer(insn, toBranch):-
+	_SimpleAssign(_, transferVar, "-3.6171687602778276E18"),
+	_AssignVar(_, ifVar, transferVar),
+	_Branch(insn, _, toBranch, ifVar).
+
+.decl CheckEOSIO(insn: Insn, toBranch: Insn)
+
+CheckEOSIO(insn, toBranch):-
+	_SimpleAssign(_, transferVar, "6.1386635915927654E18"),
+	_AssignVar(_, ifVar, transferVar),
+	_Branch(insn, _, toBranch, ifVar).
+
+.decl OnTransferAction(call: Insn, func: Function)
+
+OnTransferAction(call, action):-
+	Action(call, action),
+	CheckTransfer(_, toBranch),
+	BasicBlockHead(toBranch, call).
+
+.decl PossibleFakeToken(func: Function)
+
+PossibleFakeToken(action):-
+	OnTransferAction(call, action),
+	BasicBlockHead(callHead, call), 
+	!CheckEOSIO(_, checkedHead),
+	DominateBB(checkedHead, callHead).

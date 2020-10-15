@@ -18,8 +18,8 @@ class FakeToken : public contract {
 
       [[eosio::on_notify("*::transfer")]] 
       void transfer(name from, name to, asset quantity, string memo) {
-        check(get_first_receiver() == name("eosio.token"), "fake token");
-        // check(quantity.symbol == symbol("EOS", 2), "wrong symbol");
+        // check(get_first_receiver() == name("eosio.token"), "fake token");
+        check(quantity.symbol == symbol("EOS", 2), "wrong symbol");
       }
 
 

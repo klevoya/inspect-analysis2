@@ -15,6 +15,8 @@
 	.output NotDominateBB
 	.output DominateBB
 	.output ReachableInBB
+	.output Action
+	.output ActionFuncReachable
 #endif
 
 // Filtered follows without dead path(e.g. follows after br)
@@ -220,5 +222,27 @@ ReachableInBB(insn, insn):-
 ReachableInBB(insn, next):-
 	ReachableInBB(insn, mid),
 	NextInSameBasicBlock(mid, next).
+
+
+.decl Action(call: Insn, action: Function)
+
+Action(insn, action):-
+	_FuncCall(insn, "apply", action),
+	// eliminate some of the check functions
+	_FuncCall(_, action, _),
+	c = count : _FuncCall(_, _, action),
+	c = 1. 
+
+
+.decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
+
+ActionFuncReachable(action, to, insn):-
+	Action(_, action),
+	_FuncCall(insn, action, to).
+
+ActionFuncReachable(action, to, insn):-
+	ActionFuncReachable(action, mid, _),
+	_FuncCall(insn, mid, to).
+
 
 

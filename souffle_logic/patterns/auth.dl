@@ -7,7 +7,6 @@ Three layers:
 */
 
 #if DEBUG
-	.output ActionFuncReachable
 	.output DBRemove
 	.output DBInsn
 	.output SafeIntraDBOps
@@ -35,28 +34,6 @@ Three layers:
 // DB Remove
 // Unlikely called without DB find
 // So only consider the find and remove that can be called from the same action
-.decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
-
-/* 	
-	apply(){
-		mid();
-	}
-	mid(){
-		action1();
-		action2();
-		...
-	}
-
-*/
-ActionFuncReachable(mid, action, insn):-
-	_FuncCall(_, "apply", from),
-	_FuncCall(_, from, mid),
-	_FuncCall(insn, mid, action).
-
-ActionFuncReachable(from, to, insn):-
-	ActionFuncReachable(from, mid, _),
-	_FuncCall(insn, mid, to).
-
 
 
 .decl DBRemove(insn: Insn, payer: Var)
