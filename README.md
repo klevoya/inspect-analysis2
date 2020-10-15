@@ -39,9 +39,9 @@ inspect-analysis2$ chomod +x inspect trans
 ```
 2. Run inspect (decompiler + analysis in datalog)
 ```sh
-inspect-analysis2$ inspect foo.wasm
+inspect-analysis2$ ./inspect foo.wasm
 ```
-3. Print out the decompiled program to the terminal (Only one will be printed)
+3. Print out the decompiled program to the terminal (For debugging purpose and only one will be printed)
 ```sh
-inspect-analysis2$ trans
+inspect-analysis2$ ./trans
 ```
