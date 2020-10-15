@@ -1,9 +1,8 @@
-#define DEBUG 0
+#define DEBUG 1
 
 #include "pointer.dl"
 
 // Patterns
 #include "patterns/auth.dl"
 #include "patterns/rollback.dl"
-#include "patterns/fake_token.dl"
 
