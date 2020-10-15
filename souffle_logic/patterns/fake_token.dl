@@ -2,8 +2,9 @@
 	.output CheckTransfer
 	.output CheckEOSIO
 	.output OnTransferAction
-	.output PossibleFakeToken
 #endif
+
+.output PossibleFakeToken
 
 .decl CheckTransfer(insn: Insn, toBranch: Insn)
 

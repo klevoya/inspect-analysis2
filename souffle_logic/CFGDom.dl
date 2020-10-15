@@ -131,7 +131,7 @@
 
 	/* Case 3:
 	srcFunc{
-		src; // if src is alawys executed in the function
+		src; // if src is always executed in the function
 	}
 	fromFunc{
 		srcFunc(); 
