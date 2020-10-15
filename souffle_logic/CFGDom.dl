@@ -7,7 +7,7 @@
 		.output MustSrcInFunc
 	#endif
 
-	
+
 	.decl Src(insn: Insn)
 	.decl Target(insn: Insn)
 
@@ -52,9 +52,10 @@
 
 
 	/**** Inter procedural ****/
+	.decl InterSrcDomTarget(src: Insn, target: Insn)
+
 	// must analysis
 	// for any target(may), a src(must) dominate the target
-	.decl InterSrcDomTarget(src: Insn, target: Insn)
 
 	// find all functions where src is always executed within the function
 	.decl MustSrcInFunc(func: Function)
@@ -108,7 +109,9 @@
 	InterSrcDomTarget(src, target):-
 		Src(src),
 		_FuncInsn(func, src),
+		#if MayAnalysis
 		MustSrcInFunc(func),
+		#endif
 		_FuncCall(srcCall, _, func),
 		Target(target),
 		BasicBlockHead(targetHead, target),
@@ -119,7 +122,9 @@
 	InterSrcDomTarget(src, target):-
 		Src(src),
 		_FuncInsn(func, src),
+		#if MayAnalysis
 		MustSrcInFunc(func),
+		#endif
 		_FuncCall(srcCall, _, func),
 		Target(target),
 		ReachableInBB(srcCall, target). 
@@ -142,9 +147,11 @@
 	// srcFunc and newFunc are in different BB
 	SrcDomFunc(src, newFunc, newFuncCall):-
 		Src(src),
-		_FuncInsn(srcfunc, src),
-		MustSrcInFunc(srcfunc),
-		_FuncCall(srcCall, fromFunc, srcfunc),
+		_FuncInsn(srcFunc, src),
+		#if MayAnalysis
+		MustSrcInFunc(srcFunc),
+		#endif
+		_FuncCall(srcCall, fromFunc, srcFunc),
 		_FuncCall(newFuncCall, fromFunc, newFunc),
 		BasicBlockHead(newFuncHead, newFuncCall),
 		BasicBlockHead(srcHead, srcCall),
@@ -154,9 +161,11 @@
 	// same BB
 	SrcDomFunc(src, newFunc, newFuncCall):-
 		Src(src),
-		_FuncInsn(srcfunc, src),
-		MustSrcInFunc(srcfunc),
-		_FuncCall(srcCall, fromFunc, srcfunc),
+		_FuncInsn(srcFunc, src),
+		#if MayAnalysis
+		MustSrcInFunc(srcFunc),
+		#endif
+		_FuncCall(srcCall, fromFunc, srcFunc),
 		_FuncCall(newFuncCall, fromFunc, newFunc),
 		ReachableInBB(srcCall, newFuncCall).
 		
