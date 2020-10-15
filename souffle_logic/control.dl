@@ -228,10 +228,7 @@ ReachableInBB(insn, next):-
 
 Action(insn, action):-
 	_FuncCall(insn, "apply", action),
-	// eliminate some of the check functions
-	_FuncCall(_, action, _),
-	c = count : _FuncCall(_, _, action),
-	c = 1. 
+	_FuncCall(_, action, "read_action_data"). 
 
 
 .decl ActionFuncReachable(from: Function, to: Function, insn: Insn)

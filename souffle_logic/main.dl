@@ -1,5 +1,5 @@
-#define DEBUG 0
-#define MayAnalysis 0
+#define DEBUG 1
+#define MayAnalysis 0 // May analysis will report less violation; May < Must
 
 #include "pointer.dl"
 
