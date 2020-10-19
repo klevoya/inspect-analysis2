@@ -2,9 +2,11 @@
 	.output CheckTransfer
 	.output CheckEOSIO
 	.output OnTransferAction
+	.output PossibleFakeToken
+	.output ManualCheck
 #endif
 
-.output PossibleFakeToken
+.output FakeToken
 
 .decl CheckTransfer(insn: Insn, toBranch: Insn)
 
@@ -34,3 +36,19 @@ PossibleFakeToken(action):-
 	BasicBlockHead(callHead, call), 
 	!CheckEOSIO(_, checkedHead),
 	DominateBB(checkedHead, callHead).
+
+
+.decl ManualCheck(insn: Insn)
+
+ManualCheck(insn):-
+	_AssignType(insn, to, "Ne"),
+	_AssignVar(insn, to, from),
+	pointer.code.VarPointsToParam(from).
+
+.decl FakeToken(insn: Insn)
+
+FakeToken(insn):-
+	PossibleFakeToken(action),
+	!_FuncInsn(action, insn),
+	ManualCheck(insn).
+

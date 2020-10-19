@@ -1,4 +1,10 @@
 
+/* 
+
+Applicable to actions with DB calls
+
+*/
+
 /*
 Three layers:
 	Intra-procedural: only check if the DBOps are dominated by require_auth whithin same function
@@ -7,8 +13,6 @@ Three layers:
 */
 
 #if DEBUG
-	.output DBRemove
-	.output DBInsn
 	.output SafeIntraDBOps
 	.output PossibleAuthViolation
 	.output AuthVarForDB
@@ -18,9 +22,6 @@ Three layers:
 
 .output AuthViolation
 
-
-.init pointer = Pointer
-
 /* Auth Check */
 
 .decl AuthViolation(insn: Insn)
@@ -29,41 +30,6 @@ Three layers:
 1. DB Insn
 2. Not preceed by require_auth()
 */
-
-
-// DB Remove
-// Unlikely called without DB find
-// So only consider the find and remove that can be called from the same action
-
-
-.decl DBRemove(insn: Insn, payer: Var)
-
-DBRemove(removeInsn, payer):-
-	ActionFuncReachable(action, "db_remove_i64", removeInsn),
-	ActionFuncReachable(action, "db_find_i64", findInsn),
-	_ActualArgs(findInsn, _, 3, payer).
-
-
-
-.decl _DBInsn(insn: Insn, payer: Var)
-
-_DBInsn(insn, payer):-
-	_DBStore(insn, _, payer, _, _);
-	_DBUpdate(insn, _, payer, _);
-	DBRemove(insn, payer).
-
-
-.decl DBInsn(insn: Insn, payer: Var)
-
-// if db op on self
-DBInsn(insn, "_self"):-
-	_DBInsn(insn, payer),
-	pointer.Self(payer).
-
-DBInsn(insn, payer):-
-	_DBInsn(insn, payer),
-	!pointer.Self(payer).
-
 
 
 // Auth dom dbop wihtin CFG

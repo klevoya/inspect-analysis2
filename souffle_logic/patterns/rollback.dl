@@ -1,32 +1,43 @@
+/* 
+
+Applicable to all actions
+
+*/
+
+
 #if DEBUG
-	.output PossibleRollback
+	.output DBRollback
 	.output InlineContract
 #endif
 
 .output RollbackViolation
 
-
-
-.decl PossibleRollback(sendInsn: Insn, contract: Var)
+.decl DBRollback(sendInsn: Insn, contract: Var)
 
 // actions with both send_inline and dbOps
-PossibleRollback(sendInsn, contract):-
+DBRollback(sendInsn, contract):-
 	_ActualArgs(sendInsn, "send_inline", 0, contract),
 	ActionFuncReachable(action, _, sendInsn),
-	DBInsn(dbInsn, _),
-	ActionFuncReachable(action, _, dbInsn).
+	DBAction(action).
 	
-
 
 .decl InlineContract(sendInsn: Insn, name: Var)
 
 InlineContract(sendInsn, name):-
-	PossibleRollback(sendInsn, contract),
+	DBRollback(sendInsn, contract),
 	pointer.VarPointsTo(contract, obj),
 	_Store(_, offset, 72, name), // contract name
 	pointer.VarPointsTo(offset, obj).
-	
 
+
+// actions without dbOps
+InlineContract(sendInsn, name):-
+	_ActualArgs(sendInsn, "send_inline", 0, contract),
+	!DBRollback(sendInsn, _),
+	pointer.VarPointsTo(contract, obj),
+	_Store(_, offset, 64, name), // contract name
+	pointer.VarPointsTo(offset, obj).
+	
 
 .decl RollbackViolation(insn: Insn)
 

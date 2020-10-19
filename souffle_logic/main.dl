@@ -1,7 +1,12 @@
-#define DEBUG 1
-#define MayAnalysis 0 // May analysis will report less violation; May < Must
+#define DEBUG 0
+#define MayAnalysis 0 // May analysis will report less violation; May ⊆ Must
 
+#include "control.dl"
 #include "pointer.dl"
+
+.init pointer = Pointer
+
+#include "pre_analysis.dl"
 
 // Patterns
 #include "patterns/auth.dl"

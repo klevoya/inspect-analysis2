@@ -1,4 +1,3 @@
-#include "control.dl"
 
 .comp Pointer {
 
@@ -10,9 +9,6 @@
 	// .output ExtendedRootVar
 	// .output ExtendedCopyAssign
 	.output ExtendedVarPointsTo
-	.output Self
-	.output StoreSelf
-	.output StoreLoadSelf
 #endif
 
 
@@ -121,56 +117,72 @@ ExtendedVarPointsTo(to, var):-
 	ExtendedVarPointsTo(from, var).
 
 
+// Propagation of parameters in apply including load/store
+.comp ApplyParam{
+	#if DEBUG
+		.output VarPointsToParam
+		.output StoreParam
+		.output StoreLoadParam
+	#endif
+
+	.decl VarPointsToParam(var: Var)
+
+	VarPointsToParam(var):-
+		ExtendedVarPointsTo(var, param),
+		VarPointsToParam(param).
+
+	// offset with store param insn
+	.decl StoreParam(insn: Insn, offset: Var)
+
+	StoreParam(insn, offset):-
+		_Store(insn, offset, _, var),
+		VarPointsToParam(var).
+
+
+	.decl StoreLoadParam(storeInsn: Insn, loadInsn: Insn, loadTo: Var)
+
+	// Load from store param by matching offsets
+	StoreLoadParam(storeInsn, loadInsn, loadTo):-
+		StoreParam(storeInsn, storeOffset),
+		_Load(loadInsn, loadOffset, _, loadTo),
+		ExtendedVarPointsTo(storeOffset, to),
+		ExtendedVarPointsTo(loadOffset, to).
+
+
+
+	// reachable from store to load
+	.init store_dom_load = CFGDom
+
+	store_dom_load.Src(insn):-
+		StoreParam(insn, _).
+
+	store_dom_load.Target (insn):-
+		StoreLoadParam(_, insn, _).
+
+	VarPointsToParam(var):-
+		StoreLoadParam(store, load, var),
+		(store_dom_load.IntraSrcDomTarget(store, load);
+		store_dom_load.InterSrcDomTarget(store, load)).
+}
 
 // Taint self(reciever)
-.decl Self(var: Var)
+.init self = ApplyParam
 
-Self(var):-
-	_FormalArgs(_, "apply", 0, var).
-
-Self(var):-
-	ExtendedVarPointsTo(var, self),
-	Self(self).
-
-
-
-// offset with store self insn
-.decl StoreSelf(insn: Insn, offset: Var)
-
-StoreSelf(insn, offset):-
-	_Store(insn, offset, _, var),
-	Self(var).
-
-
-
-.decl StoreLoadSelf(storeInsn: Insn, loadInsn: Insn, loadTo: Var)
-
-// Load from store self by matching offsets
-StoreLoadSelf(storeInsn, loadInsn, loadTo):-
-	StoreSelf(storeInsn, storeOffset),
-	_Load(loadInsn, loadOffset, _, loadTo),
-	ExtendedVarPointsTo(storeOffset, to),
-	ExtendedVarPointsTo(loadOffset, to).
-
-
-
-// reachable from store to load
-.init store_dom_load = CFGDom
-
-store_dom_load.Src(insn):-
-	StoreSelf(insn, _).
-
-store_dom_load.Target (insn):-
-	StoreLoadSelf(_, insn, _).
-
-
-
-
-Self(var):-
-	StoreLoadSelf(store, load, var),
-	(store_dom_load.IntraSrcDomTarget(store, load);
-	store_dom_load.InterSrcDomTarget(store, load)).
+self.VarPointsToParam(var):-
+		_FormalArgs(_, "apply", 0, var).
 
 VarPointsTo(var, "_self"):-
-	Self(var).
+	self.VarPointsToParam(var).
+
+// Taint code
+.init code = ApplyParam
+
+code.VarPointsToParam(var):-
+		_FormalArgs(_, "apply", 1, var).
+
+VarPointsTo(var, "_code"):-
+	code.VarPointsToParam(var).
+
+
+
 }

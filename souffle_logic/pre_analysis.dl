@@ -1,0 +1,67 @@
+/* EOS related pre analysis 
+e.g.	Actions, DBInsn etc
+*/
+
+#if DEBUG
+	.output Action
+	.output ActionFuncReachable
+	.output DBRemove
+	.output DBInsn
+	.output DBAction
+#endif
+
+.decl Action(call: Insn, action: Function)
+
+Action(insn, action):-
+	_FuncCall(insn, "apply", action),
+	_FuncCall(_, action, "read_action_data"). 
+
+
+.decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
+
+ActionFuncReachable(action, to, insn):-
+	Action(_, action),
+	_FuncCall(insn, action, to).
+
+ActionFuncReachable(action, to, insn):-
+	ActionFuncReachable(action, mid, _),
+	_FuncCall(insn, mid, to).
+
+
+// DB Remove
+// Unlikely called without DB find
+// So only consider the find and remove that can be called from the same action
+
+.decl DBRemove(insn: Insn, payer: Var)
+
+DBRemove(removeInsn, payer):-
+	ActionFuncReachable(action, "db_remove_i64", removeInsn),
+	ActionFuncReachable(action, "db_find_i64", findInsn),
+	_ActualArgs(findInsn, _, 3, payer).
+
+
+.decl _DBInsn(insn: Insn, payer: Var)
+
+_DBInsn(insn, payer):-
+	_DBStore(insn, _, payer, _, _);
+	_DBUpdate(insn, _, payer, _);
+	DBRemove(insn, payer).
+
+
+.decl DBInsn(insn: Insn, payer: Var)
+
+// if db op on self
+DBInsn(insn, "_self"):-
+	_DBInsn(insn, payer),
+	pointer.self.VarPointsToParam(payer).
+
+DBInsn(insn, payer):-
+	_DBInsn(insn, payer),
+	!pointer.self.VarPointsToParam(payer).
+
+.decl DBAction(action: Function)
+
+DBAction(action):-
+	DBInsn(dbInsn, _),
+	ActionFuncReachable(action, _, dbInsn).
+

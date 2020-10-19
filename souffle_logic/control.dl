@@ -15,8 +15,6 @@
 	.output NotDominateBB
 	.output DominateBB
 	.output ReachableInBB
-	.output Action
-	.output ActionFuncReachable
 #endif
 
 // Filtered follows without dead path(e.g. follows after br)
@@ -224,22 +222,6 @@ ReachableInBB(insn, next):-
 	NextInSameBasicBlock(mid, next).
 
 
-.decl Action(call: Insn, action: Function)
-
-Action(insn, action):-
-	_FuncCall(insn, "apply", action),
-	_FuncCall(_, action, "read_action_data"). 
-
-
-.decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
-
-ActionFuncReachable(action, to, insn):-
-	Action(_, action),
-	_FuncCall(insn, action, to).
-
-ActionFuncReachable(action, to, insn):-
-	ActionFuncReachable(action, mid, _),
-	_FuncCall(insn, mid, to).
 
 
 
