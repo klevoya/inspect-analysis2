@@ -1,0 +1,124 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.1",
+    "types": [],
+    "structs": [
+        {
+            "name": "dummy",
+            "base": "",
+            "fields": [
+                {
+                    "name": "value",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "dummy1",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "dummy2",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "dummy3",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "dummy4",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "hello1",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "ownertable",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "owner",
+                    "type": "name"
+                }
+            ]
+        }
+    ],
+    "actions": [
+        {
+            "name": "dummy",
+            "type": "dummy",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "dummy1",
+            "type": "dummy1",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "dummy2",
+            "type": "dummy2",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "dummy3",
+            "type": "dummy3",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "dummy4",
+            "type": "dummy4",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "hello1",
+            "type": "hello1",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [
+        {
+            "name": "ownertable",
+            "type": "ownertable",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        }
+    ],
+    "ricardian_clauses": [],
+    "variants": []
+}
