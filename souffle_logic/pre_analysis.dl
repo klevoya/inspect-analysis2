@@ -50,14 +50,21 @@ _DBInsn(insn, payer):-
 
 .decl DBInsn(insn: Insn, payer: Var)
 
-// if db op on self
+// if dbOp on self
 DBInsn(insn, "_self"):-
 	_DBInsn(insn, payer),
 	pointer.self.VarPointsToParam(payer).
 
+// if dbOp on code
+DBInsn(insn, "_code"):-
+	_DBInsn(insn, payer),
+	pointer.code.VarPointsToParam(payer).
+
+// else
 DBInsn(insn, payer):-
 	_DBInsn(insn, payer),
-	!pointer.self.VarPointsToParam(payer).
+	!pointer.self.VarPointsToParam(payer),
+	!pointer.code.VarPointsToParam(payer).
 
 .decl DBAction(action: Function)
 

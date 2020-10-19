@@ -2,6 +2,7 @@
 mkdir -p database/
 mkdir -p artefacts/
 
+rm -r database/*
 rm -r artefacts/*
 
 java -jar binaries/inspect.jar --keep-artefacts -w artefacts/ -d -i $1

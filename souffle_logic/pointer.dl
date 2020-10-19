@@ -26,6 +26,9 @@ RootVar("$a").
 // Reciever
 RootVar("_self").
 
+// Code
+RootVar("_code").
+
 // assume uncalled funcation is the entry point
 RootVar(var):-
 	_FormalArgs(_, func, _, var),
