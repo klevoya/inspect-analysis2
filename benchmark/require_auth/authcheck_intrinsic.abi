@@ -1,0 +1,91 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.1",
+    "types": [],
+    "structs": [
+        {
+            "name": "emplaceself2",
+            "base": "",
+            "fields": [
+                {
+                    "name": "username",
+                    "type": "name"
+                },
+                {
+                    "name": "display_name",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "emplaceself3",
+            "base": "",
+            "fields": [
+                {
+                    "name": "username",
+                    "type": "name"
+                },
+                {
+                    "name": "display_name",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "emplaceself4",
+            "base": "",
+            "fields": [
+                {
+                    "name": "username",
+                    "type": "name"
+                },
+                {
+                    "name": "display_name",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "user",
+            "base": "",
+            "fields": [
+                {
+                    "name": "username",
+                    "type": "name"
+                },
+                {
+                    "name": "display_name",
+                    "type": "string"
+                }
+            ]
+        }
+    ],
+    "actions": [
+        {
+            "name": "emplaceself2",
+            "type": "emplaceself2",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "emplaceself3",
+            "type": "emplaceself3",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "emplaceself4",
+            "type": "emplaceself4",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [
+        {
+            "name": "users",
+            "type": "user",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        }
+    ],
+    "ricardian_clauses": [],
+    "variants": []
+}
