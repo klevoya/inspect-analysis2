@@ -1,4 +1,4 @@
-3#include <eosio/eosio.hpp>
+#include <eosio/eosio.hpp>
 #include <eosio/asset.hpp>
 
 using namespace eosio;
@@ -7,6 +7,7 @@ using namespace eosio;
 class WithAuth : public contract {
   public:
       using contract::contract;
+      [[on_notify *::transfer]]
       [[eosio::action]]
       void transfer(name user, uint64_t quantity) {
         people_index people(get_first_receiver(), get_first_receiver().value);

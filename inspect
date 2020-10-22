@@ -19,3 +19,6 @@ cat database/RollbackViolation.csv
 
 echo -e "\nFake Token Violation: "
 cat database/FakeToken.csv
+
+echo -e "\nSeperation Violation: "
+cat database/SeperationViolation.csv

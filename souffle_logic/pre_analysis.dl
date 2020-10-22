@@ -1,15 +1,22 @@
-/* EOS related pre analysis 
+/* EOS related pre-analysis 
 e.g.	Actions, DBInsn etc
 */
 
 #if DEBUG
+	#if VERBOSE
+		.output ActionFuncReachable
+		.output CheckTransfer
+		.output CheckEOSIO
+		.output DBRemove
+	#endif
 	.output Action
-	.output ActionFuncReachable
-	.output DBRemove
-	.output DBInsn
+	.output OnTransferAction
+	.output OnTransferEOSAction
 	.output DBAction
+	.output DBInsn
 #endif
 
+/* Action Related */
 .decl Action(call: Insn, action: Function)
 
 Action(insn, action):-
@@ -27,6 +34,46 @@ ActionFuncReachable(action, to, insn):-
 	ActionFuncReachable(action, mid, _),
 	_FuncCall(insn, mid, to).
 
+
+
+.decl CheckTransfer(insn: Insn, toBranch: Insn)
+
+CheckTransfer(insn, toBranch):-
+	_SimpleAssign(_, transferVar, "-3.6171687602778276E18"),
+	_AssignVar(_, ifVar, transferVar),
+	_Branch(insn, _, toBranch, ifVar).
+
+.decl CheckEOSIO(insn: Insn, toBranch: Insn)
+
+CheckEOSIO(insn, toBranch):-
+	_SimpleAssign(_, transferVar, "6.1386635915927654E18"),
+	_AssignVar(_, ifVar, transferVar),
+	_Branch(insn, _, toBranch, ifVar).
+
+
+.decl OnTransferAction(call: Insn, action: Function)
+
+OnTransferAction(call, action):-
+	Action(call, action),
+	CheckTransfer(_, toBranch),
+	BasicBlockHead(toBranch, call).
+
+.decl OnTransferEOSAction(call: Insn, action: Function)
+OnTransferEOSAction(call, action):-
+	OnTransferAction(call, action),
+	BasicBlockHead(callHead, call), 
+	CheckEOSIO(_, checkedHead),
+	DominateBB(checkedHead, callHead).
+
+
+.decl DBAction(action: Function)
+
+DBAction(action):-
+	DBInsn(dbInsn, _),
+	ActionFuncReachable(action, _, dbInsn).
+
+
+/* DB Related */
 
 // DB Remove
 // Unlikely called without DB find
@@ -58,7 +105,8 @@ DBInsn(insn, "_self"):-
 // if dbOp on code
 DBInsn(insn, "_code"):-
 	_DBInsn(insn, payer),
-	pointer.code.VarPointsToParam(payer).
+	pointer.code.VarPointsToParam(payer),
+	!pointer.self.VarPointsToParam(payer).
 
 // else
 DBInsn(insn, payer):-
@@ -66,9 +114,4 @@ DBInsn(insn, payer):-
 	!pointer.self.VarPointsToParam(payer),
 	!pointer.code.VarPointsToParam(payer).
 
-.decl DBAction(action: Function)
-
-DBAction(action):-
-	DBInsn(dbInsn, _),
-	ActionFuncReachable(action, _, dbInsn).
 

@@ -2,19 +2,23 @@
 #include "CFGDom.dl"
 
 #if DEBUG
+	#if VERBOSE
+		.output FuncEntry
+		.output BasicBlockBegin
+		.output BBInFunc
+		.output BasicBlockEnd
+		.output NextBasicBlock
+		.output LastBB
+		.output NotDominateBB
+	#endif
+
 	.output IfElse
 	.output Merge
-	.output FuncEntry
-	.output BasicBlockBegin
-	.output NextInSameBasicBlock
-	.output BasicBlockHead
-	.output BBInFunc
-	.output BasicBlockEnd
-	.output NextBasicBlock
-	.output LastBB
-	.output NotDominateBB
-	.output DominateBB
 	.output ReachableInBB
+	.output BasicBlockHead
+	.output NextInSameBasicBlock
+	.output DominateBB
+	.output ReachableBtwBB
 #endif
 
 // Filtered follows without dead path(e.g. follows after br)
@@ -221,7 +225,14 @@ ReachableInBB(insn, next):-
 	ReachableInBB(insn, mid),
 	NextInSameBasicBlock(mid, next).
 
+.decl ReachableBtwBB(from: Insn, to: Insn)
 
+ReachableBtwBB(from, to):-
+	NextBasicBlock(from, to).
+
+ReachableBtwBB(from, to):-
+	ReachableBtwBB(from, mid),
+	ReachableBtwBB(mid, to).
 
 
 

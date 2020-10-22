@@ -13,11 +13,13 @@ Three layers:
 */
 
 #if DEBUG
-	.output SafeIntraDBOps
-	.output PossibleAuthViolation
+	#if VERBOSE
+		.output SafeIntraDBOps
+		.output PossibleAuthViolation
+		.output PayerInFunc
+		.output PayerInFuncCallPointsTo
+	#endif
 	.output AuthVarForDB
-	.output PayerInFunc
-	.output PayerInFuncCallPointsTo
 #endif
 
 .output AuthViolation

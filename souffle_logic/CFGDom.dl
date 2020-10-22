@@ -1,10 +1,10 @@
 .comp CFGDom{
 
-	#if DEBUG
-		.output IntraSrcDomTarget
-		.output InterSrcDomTarget
+	#if DEBUG & VERBOSE
 		.output SrcDomFunc
 		.output MustSrcInFunc
+		.output IntraSrcDomTarget
+		.output InterSrcDomTarget
 	#endif
 
 

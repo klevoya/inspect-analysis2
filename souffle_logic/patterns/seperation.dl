@@ -1,0 +1,46 @@
+#if DEBUG
+	.output IfCodeEqReceiver
+	.output ReachableActionInBranch
+#endif
+
+.output SeperationViolation
+
+.decl IfCodeEqReceiver(if: Insn, br: Insn)
+
+IfCodeEqReceiver(if, br_1),
+IfCodeEqReceiver(if, br_2):-
+	_AssignType(assign, to, "Ne"),
+	_AssignVar(assign, to, code_var),
+	_AssignVar(assign, to, receiver_var),
+	code_var != receiver_var,
+	pointer.VarPointsTo(code_var, "_code"),
+	pointer.VarPointsTo(receiver_var, "_self"),
+	// only considered if_br not br_table
+	_Branch(if, br_1, br_2, to),
+	_FuncInsn("apply", if).
+
+.decl ReachableActionInBranch(if: Insn, br: Insn, call: Insn, action: Function)
+
+ReachableActionInBranch(if, br, call, action):-
+	Action(call, action),
+	IfCodeEqReceiver(if, br),
+	ReachableInBB(br, call).
+	
+// make sure it is not mereged to main branch
+// by checking other branch not dominating this action call
+ReachableActionInBranch(if, br, call, action):-
+	Action(call, action),
+	IfCodeEqReceiver(if, br),
+	BasicBlockHead(callHead, call),
+	ReachableBtwBB(br, callHead),
+	IfCodeEqReceiver(if, other_br),
+	br != other_br,
+	!DominateBB(other_br, callHead).
+
+.decl SeperationViolation(call: Insn, action: Function)
+
+SeperationViolation(call, action):-
+	ReachableActionInBranch(if, br_1, call, action),
+	ReachableActionInBranch(if, br_2, _, action),
+	br_1 != br_2.
+	

@@ -16,7 +16,8 @@ public:
   [[eosio::on_notify("*::transfer")]] void on_transfer(
       name from, name to, eosio::asset quantity, std::string memo) {
     // code parameter already checked
-    check(get_first_receiver() == name("eosio.token"), "wrong token contract");
+    // check(get_first_receiver() == name("eosio.token"), "wrong token contract");
+    check(_first_receiver == name("eosio.token"), "wrong token contract");
     check(quantity.symbol == EOS_SYMBOL, "wrong EOS symbol!");
     // ...
   }
