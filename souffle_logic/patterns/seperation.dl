@@ -37,10 +37,10 @@ ReachableActionInBranch(if, br, call, action):-
 	br != other_br,
 	!DominateBB(other_br, callHead).
 
-.decl SeperationViolation(call: Insn, action: Function)
+.decl SeperationViolation(action: Function)
 
-SeperationViolation(call, action):-
-	ReachableActionInBranch(if, br_1, call, action),
+SeperationViolation(action):-
+	ReachableActionInBranch(if, br_1, _, action),
 	ReachableActionInBranch(if, br_2, _, action),
 	br_1 != br_2.
 	

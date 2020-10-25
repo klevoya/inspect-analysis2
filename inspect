@@ -2,8 +2,8 @@
 mkdir -p database/
 mkdir -p artefacts/
 
-rm -r database/*
-rm -r artefacts/*
+rm -rf database/*
+rm -rf artefacts/*
 
 java -jar binaries/inspect.jar --keep-artefacts -w artefacts/ -d -i $1
 souffle souffle_logic/main.dl -F artefacts/* -D database/
@@ -18,7 +18,7 @@ echo -e "\nRollback Violation: "
 cat database/RollbackViolation.csv
 
 echo -e "\nFake Token Violation: "
-cat database/FakeToken.csv
+cat database/FakeTokenViolation.csv
 
 echo -e "\nSeperation Violation: "
 cat database/SeperationViolation.csv

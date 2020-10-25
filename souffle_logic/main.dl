@@ -1,5 +1,5 @@
-#define DEBUG 1
-#define VERBOSE 1
+#define DEBUG 0
+#define VERBOSE 0
 #define MayAnalysis 0 // May analysis will report less violation; May ⊆ Must
 
 #include "control.dl"
@@ -15,3 +15,19 @@
 #include "patterns/fake_token.dl"
 #include "patterns/seperation.dl"
 
+
+// Final Results for test suite
+.decl Result(violation: symbol, num: number)
+.output Result
+
+Result("Auth", num):-
+	num = count : AuthViolation(_).
+
+Result("Rollback", num):-
+	num = count : RollbackViolation(_).
+
+Result("FakeToken", num):-
+	num = count : FakeTokenViolation(_).
+
+Result("Seperation", num):-
+	num = count : SeperationViolation(_).
