@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class DoubleFind : public contract {
+CONTRACT double_find : public contract {
   public:
       using contract::contract;
       [[eosio::action]]
@@ -30,5 +30,3 @@ class DoubleFind : public contract {
   	  using people_index = eosio::multi_index<"people"_n, person>;
 };
 
-
-EOSIO_DISPATCH( DoubleFind, (transfer1)(transfer2));

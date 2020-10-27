@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class Rollback : public contract {
+CONTRACT Rollback : public contract {
   public:
       using contract::contract;
 
@@ -20,5 +20,3 @@ class Rollback : public contract {
 
 };
 
-
-EOSIO_DISPATCH( Rollback, (playgame));

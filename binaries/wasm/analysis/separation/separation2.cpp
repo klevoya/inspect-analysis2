@@ -57,7 +57,7 @@ public:
 extern "C" {
 void apply(uint64_t receiver, uint64_t code, uint64_t action) {
   if (code == receiver) {
-    switch (action) { EOSIO_DISPATCH_HELPER(separation, (dummy)(dummy1)(dummy2)(dummy4)) }
+    switch (action) { EOSIO_DISPATCH_HELPER(separation, (dummy)(dummy1)(dummy3)(dummy4)) }
   }
   // below is vulnerable
   if (action == name("transfer").value) {

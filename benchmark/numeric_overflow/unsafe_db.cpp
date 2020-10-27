@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class UnsafeDb : public contract {
+CONTRACT unsafe_db : public contract {
   public:
       using contract::contract;
       [[eosio::action]]
@@ -30,4 +30,3 @@ class UnsafeDb : public contract {
 };
 
 
-EOSIO_DISPATCH( UnsafeDb, (transfer));

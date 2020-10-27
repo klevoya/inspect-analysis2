@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class Unbounded : public contract {
+CONTRACT Unbounded : public contract {
   public:
       using contract::contract;
       [[eosio::action]]
@@ -26,5 +26,3 @@ class Unbounded : public contract {
   	  using people_index = eosio::multi_index<"people"_n, person>;
 };
 
-
-EOSIO_DISPATCH( Unbounded, (total));

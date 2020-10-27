@@ -4,10 +4,10 @@
 using namespace eosio;
 
 
-class WithAuth : public contract {
+CONTRACT with_auth : public contract {
   public:
       using contract::contract;
-      [[on_notify *::transfer]]
+      // [[on_notify *::transfer]]
       [[eosio::action]]
       void transfer(name user, uint64_t quantity) {
         people_index people(get_first_receiver(), get_first_receiver().value);
@@ -30,5 +30,3 @@ class WithAuth : public contract {
   	  using people_index = eosio::multi_index<"people"_n, person>;
 };
 
-
-EOSIO_DISPATCH( WithAuth, (transfer));

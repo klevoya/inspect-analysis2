@@ -3,7 +3,7 @@
 using namespace eosio;
 
 
-class Seperation : public contract {
+CONTRACT Seperation : public contract {
   public:
       using contract::contract;
 
@@ -17,15 +17,12 @@ class Seperation : public contract {
 
 
 extern "C" {
-  [[eosio::wasm_entry]]
-  void apply( uint64_t receiver, uint64_t code, uint64_t action ) {
-     auto self = receiver;
- 
-     if( code == self || code == "eosio.token"_n.value) {
-        switch( action ) {
-           EOSIO_DISPATCH_HELPER( Seperation, (playgame))
-        }
-     }
-  }
+  void apply(uint64_t receiver, uint64_t code, uint64_t action) {
+    if (code == receiver) {
+      switch (action) { EOSIO_DISPATCH_HELPER(Seperation, (playgame)) }
+    }else{
+     execute_action(name(receiver), name(code), &Seperation::playgame);
+    }
+   }
 }
 

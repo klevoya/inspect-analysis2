@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class NoAuthRemove : public contract {
+CONTRACT no_auth_remove : public contract {
   public:
       using contract::contract;
       [[eosio::action]]
@@ -22,6 +22,3 @@ class NoAuthRemove : public contract {
   	  };
   	  using people_index = eosio::multi_index<"people"_n, person>;
 };
-
-
-EOSIO_DISPATCH( NoAuthRemove, (transfer));

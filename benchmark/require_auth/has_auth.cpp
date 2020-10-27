@@ -34,7 +34,7 @@ public:
     }
 
     if(!has_auth(_self)){
-      require_auth(_self)
+      require_auth(_self);
     }
     
     _users.emplace(_self, [&](auto &new_user) {

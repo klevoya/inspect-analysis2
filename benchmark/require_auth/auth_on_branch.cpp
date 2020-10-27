@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class WithAuth : public contract {
+class auth_on_branch : public contract {
   public:
       using contract::contract;
       [[eosio::action]]
@@ -27,6 +27,3 @@ class WithAuth : public contract {
   	  };
   	  using people_index = eosio::multi_index<"people"_n, person>;
 };
-
-
-EOSIO_DISPATCH( WithAuth, (transfer));

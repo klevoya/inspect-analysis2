@@ -4,7 +4,7 @@
 using namespace eosio;
 using namespace std;
 
-class FakeToken : public contract {
+CONTRACT checked_token : public contract {
   public:
       using contract::contract;
 
@@ -17,4 +17,3 @@ class FakeToken : public contract {
 };
 
 
-EOSIO_DISPATCH( FakeToken, (transfer));

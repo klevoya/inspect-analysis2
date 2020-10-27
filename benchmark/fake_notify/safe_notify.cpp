@@ -4,7 +4,7 @@
 using namespace eosio;
 using namespace std;
 
-class FakeNotify : public contract {
+CONTRACT safe_notify : public contract {
   public:
       using contract::contract;
 
@@ -15,6 +15,3 @@ class FakeNotify : public contract {
       }
 
 };
-
-
-EOSIO_DISPATCH( FakeNotify, (playgame));

@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class WithAuth : public contract {
+CONTRACT with_self_auth : public contract {
   public:
       using contract::contract;
       [[eosio::action]]
@@ -27,4 +27,3 @@ class WithAuth : public contract {
 };
 
 
-EOSIO_DISPATCH( WithAuth, (transfer));

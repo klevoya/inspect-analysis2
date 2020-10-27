@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class NoAuth : public contract {
+CONTRACT no_auth : public contract {
   public:
       using contract::contract;
       [[eosio::action]]
@@ -27,4 +27,3 @@ class NoAuth : public contract {
 };
 
 
-EOSIO_DISPATCH( NoAuth, (transfer));

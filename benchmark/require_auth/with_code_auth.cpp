@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-class NoAuth : public contract {
+CONTRACT with_code_auth : public contract {
   public:
       using contract::contract;
       [[eosio::action]]
@@ -26,5 +26,3 @@ class NoAuth : public contract {
       using people_index = eosio::multi_index<"people"_n, person>;
 };
 
-
-EOSIO_DISPATCH( NoAuth, (transfer));
