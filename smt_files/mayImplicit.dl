@@ -38,21 +38,21 @@
     .decl reassignDatabase	(l:Label, v:Var)
     .decl removeDatabase	(l:Label, v:Var)
     */
-    .decl mstoreOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
-    .decl mloadOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
+    .decl mstoreOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:Var)
+    .decl mloadOffsetsPropagtd (l: Label, dynOffset:Var, memargOffset:Var, f:Var)
     .decl memcpyOffsetsPropagtd (l: Label, destOffset:Var, srcOffset:Var)
 
     //
     // Outputs
     //
-    .decl flowsToVar        (l: Label, v: Var, f: VarFact)
-    .decl flowsToVarInter   (l: Label, v: Var, f: VarFact)
-    .decl flowsToMem        (l: Label, dynOffset: Var, memargOffset: Var, f:VarFact)
-    .decl database          (itr: Var, payer:Var, f: VarFact)
+    .decl flowsToVar        (l: Label, v: Var, f: Var)
+    .decl flowsToVarInter   (l: Label, v: Var, f: Var)
+    .decl flowsToMem        (l: Label, dynOffset: Var, memargOffset: Var, f:Var)
+    .decl database          (itr: Var, payer:Var, f: Var)
     .decl functionAssign    (l: Label, v1: Var, v2: Var)
-    .decl isAfter           (l1: Label, l2: Label)
-    .decl taintPropagated   (l1: Label, l2: Label, cond: Var)
-    .decl flowsToVarBetwFunctions(callerSite: Label, funcLabel: Label, varInFuncDefinition: Var, fact: VarFact)
+    .decl isAfter           (l1: Element, l2: Element) // changed from: Label
+    .decl taintPropagated   (l1: Element, l2: Element, cond: Var) // changed from: Label
+    .decl flowsToVarBetwFunctions(callerSite: Label, funcLabel: Label, varInFuncDefinition: Var, fact: Var)
 
     // Declare outputs
     .output flowsToVar
@@ -69,10 +69,10 @@
     //
 #ifdef MAY_CONTROL_FLOW
     // Below is higher granularity, but leads to combinatorial explosion. Try to limit to functions of interest
-    isAfter(LabFrom, LabTo) :- mayfollows(LabFrom, LabTo).
+    isAfter(LabFrom, LabTo) :- follows(LabFrom, LabTo).
 
     isAfter(LabFrom, LabTo) :- isAfter(LabFrom, Lab),
-                               mayfollows(Lab, LabTo).
+                               follows(Lab, LabTo).
 
     // If the instruction at LabTo follows an instruction at LabThenElse, and
     // If there is a branch statement at LabIf that branches to LabThenElse, based on condition Var, and
@@ -90,7 +90,7 @@
     ---*/
     // Convert each assignment into context-free dataflow rules
     flowsToVar(Lab, Var, Fact) :- assignVar(Lab, Var, Fact).
-    flowsToVar(Lab, Var, Fact) :- assignType(Lab, Var, Fact).
+    // flowsToVar(Lab, Var, Fact) :- assignType(Lab, Var, Fact).
     flowsToVar(Lab, Var, Fact) :- throw(Lab, Fact, Var).
 
     flowsToVar(Lab, VarDest, VarSrc) :-
@@ -236,15 +236,15 @@
 
     /* Propagate Facts for memory reads.
      * Loading contents from memory address [DynOffset, MemargOffset] into Var, and
-     * If a VarFact flowed into the same address, then VarFact flows through that memory into Var.
+     * If a Var flowed into the same address, then Var flows through that memory into Var.
      */
-    flowsToVar(Lab, Var, VarFact) :-
+    flowsToVar(Lab, Var, Var) :-
         mloadOffsetsPropagtd(Lab, DynOffset, MemargOffset, Var),
     #ifdef MAY_CONTROL_FLOW
         isAfter(LabFlow, Lab),
-        flowsToMem(LabFlow, DynOffset, MemargOffset, VarFact).
+        flowsToMem(LabFlow, DynOffset, MemargOffset, Var).
     #else
-        flowsToMem(_, DynOffset, MemargOffset, VarFact).
+        flowsToMem(_, DynOffset, MemargOffset, Var).
     #endif
 
     /* Propagate for memcpy */

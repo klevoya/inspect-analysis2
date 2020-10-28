@@ -9,10 +9,10 @@
     (call $env.require_auth
       (local.get $p1))
     (call $store_in_db
+      (local.get $p1)
       (i64.add
         (local.get $p0)
-        (i64.const 1))
-      (local.get $p1))
+        (i64.const 1)))
     (call $store_in_db
       (i64.const 6100991154140239360)
       (i64.const -7704843146101080064))

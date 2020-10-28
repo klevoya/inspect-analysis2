@@ -16,13 +16,13 @@
 
 #define ENABLE_INPUT_FROM_FILES
 
-.symbol_type Label
-.symbol_type Instruction
-.symbol_type Var
-.symbol_type Fact
-.symbol_type Function
-.symbol_type Index
-.type VarFact = Var|Fact
+
+.type Var <: symbol
+.type Index <: symbol
+
+.type Label <: symbol
+.type Instruction <: symbol
+.type Function <: symbol
 .type Element = Label | Instruction | Function      // any program element
 
 //
@@ -30,38 +30,43 @@
 // May and Must facts are equivalent with the exception of follows, join & jump. In addition taint only exists for May.
 // TODO: Consolidate the facts in Java Dataflow
 //
-.decl assignType    (l:Label, v:Var, f:Fact)
+.decl assignType    (label: Label, var: Var, type: symbol)
 GET_REL_FROM_FILE(assignType, "must/assignType.facts")
 
-.decl assignVar		(l:Label, v1: Var, v2: Var)
+.decl assignVar		(label: Label, to: Var, from: Var)
 GET_REL_FROM_FILE(assignVar, "must/assignVar.facts")
 
 // Linear following instructions as well as branches
-.decl follows		(l1: Label, l2: Label)
+.decl follows		(prev: Label, next: Label)
 GET_REL_FROM_FILE(follows, "must/follows.facts")
 
-.decl mayfollows		(l1: Label, l2: Label)
-GET_REL_FROM_FILE(mayfollows, "may/follows.facts")
-
-.decl jump		    (l1: Label, l2: Label, l3: Label)
+// Rex: Needs to be clarified
+// l1: jump l3
+// l2: something
+// l3: ... 
+.decl jump		    (from: Label, l2: Label, l3: Label)
 GET_REL_FROM_FILE(jump, "must/jump.facts")
 
-.decl mayjump		    (l1: Label, l2: Label, l3: Label)
-GET_REL_FROM_FILE(mayjump, "may/jump.facts")
-
-// Where several branches join. Different to tag how?
+// Rex: Needs to be clarified
+// Where several branches join. Different to tag how? 
 .decl join		    (l1: Label, l2: Label, l3: Label)
+// A B C
+//   D
+
+// D A
+// D B
+// D C
 GET_REL_FROM_FILE(join, "must/join.facts")
 
-.decl mayjoin		    (l1: Label, l2: Label, l3: Label)
-GET_REL_FROM_FILE(mayjoin, "may/join.facts")
+// Rex: Needs to be clarified
 
 /* May Analysis control flow:
 // The branch condition, cond, from label, l1, taints the instruction at label, l2
 // E.g. taint(if_label, else_label/end_label, if_condition) */
-.decl taint		    (labIfInstr:Label, labThenElseInstr:Label, cond:Var)
+.decl taint		    (ifInst:Label, labThenElseInstr:Label, cond:Var)
 GET_REL_FROM_FILE(taint, "may/taint.facts")
 
+// Rex: Return Statment?
 // Branch destination
 .decl tag           (l1: Label)
 GET_REL_FROM_FILE(tag, "must/tag.facts")
@@ -70,38 +75,39 @@ GET_REL_FROM_FILE(tag, "must/tag.facts")
 GET_REL_FROM_FILE(oneBranchTag, "must/oneBranchTag.facts")
 
 // End of branch (not used in original Must analysis)
-.decl endIf		    (l1: Label, l2: Label)
+.decl endIf		    (ifInst: Label, end: Label)
 GET_REL_FROM_FILE(endIf, "must/endIf.facts")
 
-.decl mload		    (l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
+.decl mload		    (label: Label, dynOffset:Var, memargOffset:Var, f:Var)
 GET_REL_FROM_FILE(mload, "must/mload.facts")
 
-.decl mstore		(l: Label, dynOffset:Var, memargOffset:Var, f:VarFact)
+.decl mstore		(label: Label, dynOffset:Var, memargOffset:Var, f:Var)
 GET_REL_FROM_FILE(mstore, "must/mstore.facts")
 
-.decl memcpy		(l: Label, destOffset:Var, srcOffset:Var)
+.decl memcpy		(label: Label, destOffset:Var, srcOffset:Var)
 GET_REL_FROM_FILE(memcpy, "must/memcpy.facts")
 
-.decl dbget		    (l: Label, v:Var, itr:Var)
+// Rex: is var the row in the table?
+.decl dbget		    (label: Label, var:Var, itr:Var)
 GET_REL_FROM_FILE(dbget, "must/dbget.facts")
 
-.decl dbstore		(l: Label, itr:Var, payer:Var, key:Var, data:Var)
+.decl dbstore		(label: Label, itr:Var, payer:Var, key:Var, data:Var)
 GET_REL_FROM_FILE(dbstore, "must/dbstore.facts")
 
-.decl dbupdate        (l: Label, itr: Var, payer: Var, data: Var)
+.decl dbupdate        (label: Label, itr: Var, payer: Var, data: Var)
 GET_REL_FROM_FILE(dbupdate, "must/dbupdate.facts")
 
-.decl dbremove		(l: Label, itr:Var)
+.decl dbremove		(label: Label, itr:Var)
 GET_REL_FROM_FILE(dbremove, "must/dbremove.facts")
 
-.decl unk	        (f:VarFact)
+.decl unk	        (unkown: Var)
 GET_REL_FROM_FILE(unk, "must/unk.facts")
 
-.decl throw		    (l: Label, f:Fact, v:Var)
+.decl throw		    (label: Label, f:Var, v:Var)
 GET_REL_FROM_FILE(throw, "must/throw.facts")
 
 // Not sure this is easy to extract a priori? Alternative is to do in datalog, but could be messy
-.decl fnCallGraph       (fnfrom: Function, fnto: Function)
+.decl fnCallGraph       (fnFrom: Function, fnTo: Function)
 GET_REL_FROM_FILE(fnCallGraph, "must/fnCallGraph.facts")
 
 // Mapping of each instruction to its containing function
@@ -110,21 +116,21 @@ GET_REL_FROM_FILE(fnInstr, "must/fnInstr.facts")
 
 // For a formal function definition. Shows which variable is an argument of the
 // function at a certain index, i.e. n-th argument
-.decl fnDefinitionArgument   (l:Label, fn: Function, argind: Index, arg: Var)
+.decl fnDefinitionArgument   (fnDef:Label, fnName: Function, index: Index, arg: Var)
 GET_REL_FROM_FILE(fnDefinitionArgument, "must/fnDefinitionArgument.facts")
 
 // For a formal function definition. Return value of the function.
-.decl fnDefinitionRtn   (l:Label, fn: Function, rtn: Var)
+.decl fnDefinitionRtn   (fnDef:Label, fnName: Function, return: Var)
 GET_REL_FROM_FILE(fnDefinitionRtn, "must/fnDefinitionRtn.facts")
 
 // Function call from given label i.e. invocation site
-.decl fnCall            (l:Label, fromfn:Function, tofn:Function)
+.decl fnCall            (callSite:Label, fromFn:Function, toFn:Function)
 GET_REL_FROM_FILE(fnCall, "must/fnCall.facts")
 
 // Captures the actual arguments at the invocation of a function
-.decl fnCallArgument      (l: Label, fn: Function, argind: Index, arg: Var)
+.decl fnCallArgument      (callSite: Label, fnName: Function, index: Index, arg: Var)
 GET_REL_FROM_FILE(fnCallArgument, "must/fnCallArgument.facts")
 
 // Captures the actual return value at the invocation of a function
-.decl fnCallRtn   (l: Label, fn: Function, rtn: Var)
+.decl fnCallRtn   (callSite: Label, fnName: Function, return: Var)
 GET_REL_FROM_FILE(fnCallRtn, "must/fnCallRtn.facts")

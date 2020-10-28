@@ -1,0 +1,182 @@
+.comp CFGDom{
+
+	#if DEBUG & VERBOSE
+		.output SrcDomFunc
+		.output MustSrcInFunc
+		.output IntraSrcDomTarget
+		.output InterSrcDomTarget
+	#endif
+
+
+	.decl Src(insn: Insn)
+	.decl Target(insn: Insn)
+
+	/**** Intra procedural ****/
+
+	.decl IntraSrcDomTarget(src: Insn, target: Insn)
+	
+
+	/*
+	func(){
+		BB:
+			src;
+			target;
+	}
+
+	*/
+
+	// src and target are in same block
+	IntraSrcDomTarget(src, target):-
+		Src(src),
+		Target(target),
+		ReachableInBB(src, target).
+
+
+	/*
+	func(){
+		BB:
+			src;
+		BB2:
+			target;
+	}
+
+	*/
+	// different block
+	IntraSrcDomTarget(src, target):-
+		Src(src),
+		Target(target),
+		BasicBlockHead(srcHead, src),
+		BasicBlockHead(targetHead, target),
+		DominateBB(srcHead, targetHead). 
+
+
+
+	/**** Inter procedural ****/
+	.decl InterSrcDomTarget(src: Insn, target: Insn)
+
+	// must analysis
+	// for any target(may), a src(must) dominate the target
+
+	// find all functions where src is always executed within the function
+	.decl MustSrcInFunc(func: Function)
+
+	MustSrcInFunc(func):-
+		Src(src),
+		_FuncInsn(func, src),
+		BasicBlockHead(srcHead, src),
+		LastBB(last, func), // only considering one exit atm
+		DominateBB(srcHead, last).
+
+	.decl SrcDomFunc(src: Insn, func: Function, funcCall: Insn)
+
+	/*  Case 1:
+	func1{
+		src;
+		func2();
+	}
+	func2(){
+		target;
+	}
+	*/
+
+	// src, func2
+	// different BB
+	SrcDomFunc(src, newFunc, funcCall):-
+		Src(src),
+		BasicBlockHead(srcHead, src),
+		_FuncCall(funcCall, _, newFunc),
+		BasicBlockHead(funcHead, funcCall),
+		DominateBB(srcHead, funcHead).
+
+	// same BB
+	SrcDomFunc(src, newFunc, funcCall):-
+		Src(src),
+		_FuncCall(funcCall, _, newFunc),
+		ReachableInBB(src, funcCall).
+
+	/* Case 2:
+	func1{
+		src // if src is alawys executed in the function
+	}
+	func2{
+		func1(); 
+		target;
+		....
+	}
+	*/
+
+	// func1 and target are in different BB
+	InterSrcDomTarget(src, target):-
+		Src(src),
+		_FuncInsn(func, src),
+		#if MayAnalysis
+		MustSrcInFunc(func),
+		#endif
+		_FuncCall(srcCall, _, func),
+		Target(target),
+		BasicBlockHead(targetHead, target),
+		BasicBlockHead(srcHead, srcCall),
+		DominateBB(srcHead, targetHead).
+
+	// same BB
+	InterSrcDomTarget(src, target):-
+		Src(src),
+		_FuncInsn(func, src),
+		#if MayAnalysis
+		MustSrcInFunc(func),
+		#endif
+		_FuncCall(srcCall, _, func),
+		Target(target),
+		ReachableInBB(srcCall, target). 
+
+	/* Case 3:
+	srcFunc{
+		src; // if src is always executed in the function
+	}
+	fromFunc{
+		srcFunc(); 
+		newFunc();
+	}
+	newFunc(){
+		target; // may executed
+	}
+	*/
+
+	// src, newFunc
+
+	// srcFunc and newFunc are in different BB
+	SrcDomFunc(src, newFunc, newFuncCall):-
+		Src(src),
+		_FuncInsn(srcFunc, src),
+		#if MayAnalysis
+		MustSrcInFunc(srcFunc),
+		#endif
+		_FuncCall(srcCall, fromFunc, srcFunc),
+		_FuncCall(newFuncCall, fromFunc, newFunc),
+		BasicBlockHead(newFuncHead, newFuncCall),
+		BasicBlockHead(srcHead, srcCall),
+		DominateBB(srcHead, newFuncHead).
+
+
+	// same BB
+	SrcDomFunc(src, newFunc, newFuncCall):-
+		Src(src),
+		_FuncInsn(srcFunc, src),
+		#if MayAnalysis
+		MustSrcInFunc(srcFunc),
+		#endif
+		_FuncCall(srcCall, fromFunc, srcFunc),
+		_FuncCall(newFuncCall, fromFunc, newFunc),
+		ReachableInBB(srcCall, newFuncCall).
+		
+	// recursion, can be overlooked for performance
+	SrcDomFunc(src, newFunc, newFuncCall):-
+		SrcDomFunc(src, fromFunc, _),
+		_FuncCall(newFuncCall, fromFunc, newFunc).
+
+	// Case 1 & 3
+	InterSrcDomTarget(src, target):-
+		SrcDomFunc(src, func, _),
+		Target(target),
+		_FuncInsn(func, target).
+}

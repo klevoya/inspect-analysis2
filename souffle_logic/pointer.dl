@@ -1,0 +1,259 @@
+
+.comp Pointer {
+
+#if DEBUG
+	#if VERBOSE
+		.output RootVar
+		.output IntraCopyAssign
+		.output InterCopyAssign
+		.output ExtendedRootVar
+		.output ExtendedCopyAssign
+		.output ExtendedVarPointsTo
+	#endif
+	.output LoadActionParam
+	.output VarPointsTo
+#endif
+
+
+.decl RootVar(var: Var)
+
+// Root Var includes const, arithmetic result and entry point parameters
+RootVar(var):-
+	_AssignType(_, var, _),
+	!_AssignType(_, var, "Copy"),
+	!_AssignType(_, var, "Call").
+
+// Global variable
+RootVar("$a").
+
+// Reciever
+RootVar("_self").
+
+// Code
+RootVar("_code").
+
+// assume uncalled funcation is the entry point
+RootVar(var):-
+	_FormalArgs(_, func, _, var),
+	!_FuncCall(_, _, func).
+
+
+
+// copys wihtin function
+.decl IntraCopyAssign(insn: Insn, to: Var, from: Var)
+
+IntraCopyAssign(insn, to, from):-
+	_AssignVar(insn, to, from),
+	_AssignType(insn, to, "Copy"),
+	to != "$a".
+
+
+
+// taint for action parameter
+
+.decl LoadActionParam(insn: Insn, to: Var, from: Var)
+
+LoadActionParam(insn, to, cat(cat(action, "_"), to_string(index))):-
+	_Load(insn, from, offset, to),
+	_AssignVar(_, from, base),
+	ActionParam(action, base, offset_symbol, index),
+	offset = to_number(offset_symbol).
+
+
+// sepcial VarPointsTo for action param to avoid double negation
+.decl _VarPointsTo(var1: Var, var2: Var)
+
+_VarPointsTo(var, var):-
+	RootVar(var).
+
+// Copys
+_VarPointsTo(to, var):-
+	_InterCopyAssign(to, from),
+	_VarPointsTo(from, var).
+
+.decl StoreActionParam(address: Var, offset: number, var: Var)
+
+StoreActionParam(address, offset, to):-
+	_VarPointsTo(var, to),
+	LoadActionParam(_, _, to),
+	_Store(_, address_var, offset, var), 
+	_AssignVar(_, address_var, address).
+
+.decl StoreLoadActionParam(insn: Insn, to: Var, from: Var)
+
+StoreLoadActionParam(insn, to, from):-
+	LoadActionParam(insn, to, from).
+
+StoreLoadActionParam(insn, to, from):-
+	StoreActionParam(address, offset, from),
+	_Load(insn, address_var, offset, to),
+	_AssignVar(_, address_var, address).
+
+
+// load action parameters
+RootVar(from),
+IntraCopyAssign(insn, to, from):-
+	StoreLoadActionParam(insn, to, from).
+
+
+// intermediate for action param to avoid double negation
+.decl _InterCopyAssign(to: Var, from: Var)
+
+_InterCopyAssign(to, from):-
+	IntraCopyAssign(_, to, from).
+
+// argument mapping
+_InterCopyAssign(to, from):-
+	_ActualArgs(_, func, index, from),
+	_FormalArgs(_, func, index, to).
+
+// return value mapping
+_InterCopyAssign(to, from):-
+	_FormalReturn(_, func, from),
+	_ActualReturn(_, func, to).
+
+// copys include mapping through parameters and return values
+.decl InterCopyAssign(to: Var, from: Var)
+
+InterCopyAssign(to, from):-
+	_InterCopyAssign(to, from).
+
+// load mapping, very crude but enough for checking alias
+InterCopyAssign(to, from):-
+	_Load(insn, from, _, to),
+	!StoreLoadActionParam(insn, _, _).
+
+
+
+.decl VarPointsTo(var1: Var, var2: Var)
+
+// For require_auth, the user should only come from apply(...) or get_self()
+// could restrict to use-def chain of require_auth and dbOps vars
+
+// root -> root
+VarPointsTo(var, var):-
+	RootVar(var).
+
+// Copys
+VarPointsTo(to, var):-
+	InterCopyAssign(to, from),
+	VarPointsTo(from, var).
+
+
+
+
+// inlcuding arithmetic operations
+.decl ExtendedRootVar(var: Var)
+
+ExtendedRootVar(var):-
+	RootVar(var),
+	!_AssignType(_, var, "Add"),
+	!_AssignType(_, var, "Sub").
+
+
+
+.decl ExtendedCopyAssign(to: Var, from: Var)
+
+ExtendedCopyAssign(to, from):-
+	InterCopyAssign(to, from).
+
+ExtendedCopyAssign(to, from):-
+	_AssignVar(insn, to, from),
+	(_AssignType(insn, to, "Add");
+	_AssignType(insn, to, "Sub")).
+
+
+
+.decl ExtendedVarPointsTo(var: Var, to: Var)
+
+// root -> root
+ExtendedVarPointsTo(var, var):-
+	ExtendedRootVar(var).
+
+// Copys
+ExtendedVarPointsTo(to, var):-
+	ExtendedCopyAssign(to, from),
+	ExtendedVarPointsTo(from, var).
+
+
+// Propagation of parameters in apply including load/store
+.comp ApplyParam{
+	#if DEBUG && VERBOSE
+		.output VarPointsToParam
+		.output StoreParam
+		.output StoreLoadParam
+	#endif
+
+	.decl VarPointsToParam(var: Var)
+
+	VarPointsToParam(var):-
+		ExtendedVarPointsTo(var, param),
+		VarPointsToParam(param).
+
+	// offset with store param insn
+	.decl StoreParam(insn: Insn, offset: Var)
+
+	StoreParam(insn, offset):-
+		_Store(insn, offset, _, var),
+		VarPointsToParam(var).
+
+
+	.decl StoreLoadParam(storeInsn: Insn, loadInsn: Insn, loadTo: Var)
+
+	// Load from store param by matching offsets
+	StoreLoadParam(storeInsn, loadInsn, loadTo):-
+		StoreParam(storeInsn, storeOffset),
+		_Load(loadInsn, loadOffset, _, loadTo),
+		!StoreLoadActionParam(loadInsn, _, _),
+		ExtendedVarPointsTo(storeOffset, to),
+		ExtendedVarPointsTo(loadOffset, to).
+
+
+	VarPointsToParam(var):-
+		StoreLoadParam(_, _, var).
+
+	// may not be useful
+
+	// reachable from store to load
+	// .init store_dom_load = CFGDom
+
+	// store_dom_load.Src(insn):-
+	// 	StoreParam(insn, _).
+
+	// store_dom_load.Target (insn):-
+	// 	StoreLoadParam(_, insn, _).
+
+	// VarPointsToParam(var):-
+	// 	StoreLoadParam(store, load, var),
+	// 	(store_dom_load.IntraSrcDomTarget(store, load);
+	// 	store_dom_load.InterSrcDomTarget(store, load)).
+}
+
+// Taint self(reciever)
+.init self = ApplyParam
+
+self.VarPointsToParam(var):-
+		_FormalArgs(_, "apply", 0, var).
+
+self.VarPointsToParam(var):-
+	_ActualReturn(_, "current_receiver", var).
+
+
+// Taint code
+.init code = ApplyParam
+
+code.VarPointsToParam(var):-
+		_FormalArgs(_, "apply", 1, var).
+
+
+
+
+VarPointsTo(var, "_self"):-
+	self.VarPointsToParam(var).
+
+VarPointsTo(var, "_code"):-
+	code.VarPointsToParam(var).
+
+
+
+}

@@ -1,0 +1,150 @@
+
+/* 
+
+Applicable to actions with DB calls
+
+*/
+
+/*
+Three layers:
+	Intra-procedural: only check if the DBOps are dominated by require_auth whithin same function
+	Inter-procedural: only check if require_auth dominate functions with DBOps (payer variables set mataching)
+	Flow sensitive: check if require_auth dominate the function call with the according payer varaible (ordered matching)
+*/
+
+#if DEBUG
+	#if VERBOSE
+		.output SafeIntraDBOps
+		.output PossibleAuthViolation
+		.output PayerInFunc
+		.output PayerInFuncCallPointsTo
+	#endif
+	.output AuthVarForDB
+#endif
+
+.output AuthViolation
+
+/* Auth Check */
+
+.decl AuthViolation(insn: Insn)
+
+/* Violation: 
+1. DB Insn
+2. Not preceed by require_auth()
+*/
+
+
+// Auth dom dbop wihtin CFG
+.init auth_dom_db = CFGDom
+
+auth_dom_db.Src(check):-
+	_FuncCall(check, _, "require_auth").
+
+auth_dom_db.Target(target):-
+	DBInsn(target, _).
+
+
+
+/* Intra-procedural rules*/
+
+.decl SafeIntraDBOps(dbInsn: Insn)
+
+// only safe if the users are the same in both instructions
+SafeIntraDBOps(dbInsn):-
+	auth_dom_db.IntraSrcDomTarget(check, dbInsn),
+	_ActualArgs(check, "require_auth", 0, authVar),
+	DBInsn(dbInsn, payerVar),
+	pointer.VarPointsTo(authVar, user),
+	pointer.VarPointsTo(payerVar, user).
+
+
+
+// Result obtianed from  intra-procedrual analysis
+.decl PossibleAuthViolation(insn: Insn)
+
+PossibleAuthViolation(insn):-
+	DBInsn(insn, _),
+	!SafeIntraDBOps(insn).
+
+
+
+/* Inter-procedural rules*/
+
+.decl AuthVarForDB(authInsn: Insn, var: Var, dbInsn: Insn)
+
+AuthVarForDB(check, var, dbInsn):-
+	auth_dom_db.InterSrcDomTarget(check, dbInsn),
+	_ActualArgs(check, "require_auth", 0, authVar),
+	pointer.VarPointsTo(authVar, var).
+
+
+/* Case:
+	Func1(){
+		1: require_auth (A) // Auth(A)
+		2: Func2(A)
+		3: Func2(B)
+	}
+
+	Func2(C){
+		4: DbOps(C) // C -> A, C -> B
+	}
+
+	Expect violation at 4
+*/
+
+// If miss some payer auths 
+
+AuthViolation(dbInsn):-
+	PossibleAuthViolation(dbInsn),
+	!AuthVarForDB(_, to, dbInsn),
+	DBInsn(dbInsn, payer),
+	pointer.VarPointsTo(payer, to).
+
+
+/* Flow Sensitive rules*/
+
+/* Case
+	Func1(){
+		1: require_auth (B) // Auth(B)
+		2: Func2(A) // A
+		3: require_auth (A) // Auth(A)
+		4: Func2(B) // B
+	}
+	Func2(C){
+		5: Db_insn: Db_Store(C) // C -> A, C -> B
+	}
+
+	Expect violation at 5
+*/
+
+
+.decl PayerInFunc(dbInsn: Insn, payerVar: Var, func: Function)
+
+// payerVar in dbOps
+PayerInFunc(dbInsn, payerVar, func):-
+	PossibleAuthViolation(dbInsn),
+	_FuncInsn(func, dbInsn),
+	DBInsn(dbInsn, payerVar).
+
+// All the payer var within the function
+PayerInFunc(dbInsn, to, func):-
+	PayerInFunc(dbInsn, from, func),
+	pointer.IntraCopyAssign(_, from, to).
+
+// capture payer points to if payer is passed by parameters
+.decl PayerInFuncCallPointsTo(dbInsn: Insn, to: Var, funcCall: Insn)
+
+PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
+	PayerInFunc(dbInsn, formalVar, func),
+	_FormalArgs(_, func, index, formalVar),
+	_ActualArgs(funcCall, func, index, actualVar),
+	pointer.VarPointsTo(actualVar, to).
+
+// For mixed order
+AuthViolation(dbInsn):-
+	PayerInFuncCallPointsTo(dbInsn, to, funcCall),
+	!auth_dom_db.SrcDomFunc(check, _, funcCall),
+	_ActualArgs(check, "require_auth", 0, authVar),
+	pointer.VarPointsTo(authVar, to).
+
+

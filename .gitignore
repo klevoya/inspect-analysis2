@@ -3,3 +3,9 @@
 artefacts/
 logs/
 *.iml
+**._*
+**.DS_Store
+database/
+benchmark/BancorX
+profile
+**.abi

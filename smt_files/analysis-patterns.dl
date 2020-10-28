@@ -14,12 +14,12 @@
  *  limitations under the License.
  */
 
-.symbol_type PatternId
+.type PatternId <: symbol
 
 /** Numeric Match ID (note [[PatternBase]]'s MatchId will be translated via ord(X)) */
-.number_type MatchId
-.symbol_type MatchType
-.symbol_type MatchComment
+.type MatchId <: number 
+.type MatchType <: symbol
+.type MatchComment <: symbol
 
 // Match Types
 #define WARNING   "warning"
@@ -49,6 +49,7 @@
     .output compliance
     .output violation
 
+    // Rex: Not used
     matchId(context, element) :-
         (
             applicable(context, element, _);

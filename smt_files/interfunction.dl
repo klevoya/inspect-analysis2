@@ -18,6 +18,7 @@
 //#define INC_MUST_PRECEDE2 1
 
 // Maps instructions to their containing functions
+// Rex: Maybe redundant
 .decl inFunction(instr: Label, fn: Function)
 inFunction(instr, func) :-
     fnInstr(func, instr).
@@ -123,7 +124,7 @@ mustPrecedeEosOnly(prevInstr, callerInstr, nextInstr) :-
     mustPrecedeAtPredecessor(callerInstr, nextInstr),
     controlFlow.isInstrCallingAnEosFunction(nextInstr).     // Include this line to limit number of tuples to EOS fns
 
-.decl flowsToVarBetwFunctions(callerSite: Label, funcLabel: Label, varInFuncDefinition: Var, fact: VarFact)
+.decl flowsToVarBetwFunctions(callerSite: Label, funcLabel: Label, varInFuncDefinition: Var, fact: Var)
 
 /* Take var/fact assignment and propagate it from function caller to the variable in the function definition
    Need to work out function call graph on the fly when propagating dataflow between functions

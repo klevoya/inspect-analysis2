@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+import sys,os,glob
+import subprocess
+import time
+import csv
+
+
+END = "\033[0m"
+
+def warn(line):
+	return "\033[1;31m" + line + END
+
+def nuetral(line):
+	return "\033[90m" + line + END
+
+def good(line):
+	return "\033[1;32m" + line + END
+
+def bold(line):
+	return "\033[1m" + line + END
+
+
+def check_diff(expected, actual):
+	passed = True
+	actual = open(actual, mode='r').readlines()
+	if not os.path.isfile(expected): 
+		print(warn("Expected output file " + expected + " does not exist."))
+		print("Creating from actual output...")
+		with open(expected, 'w') as f:
+		    for row in actual:
+		        f.write("%s" % row)
+
+	expected = open(expected, mode='r').readlines()
+	for i, row in enumerate(expected):
+		if i == len(actual):
+			print(warn("Line number mistach"))
+			return False
+		if row != actual[i]:
+			passed = False
+			print(warn("Actual:"), actual[i], end="")
+			print(good("Expected:"), row, end="")
+
+	return passed
+
+
+
+def run_n_check(file):
+	print("Test case:", nuetral(file))
+	with open(os.devnull, "w") as f:
+		subprocess.call("./inspect " + file, shell=True, stdout=f)
+
+	expected = os.path.splitext(file)[0] + ".out"
+	actual = os.getcwd() + "/database/Result.csv"
+
+	return check_diff(expected, actual)
+
+def run_folder(folder):
+	print("Running folder:", bold(folder))
+	tests = glob.glob1(folder,"*.wasm")
+
+	passed = 0
+	for test in tests:
+		start_time = time.time()
+		if run_n_check(folder + test):
+			print(good(u'\u2713'))
+			passed += 1
+		else:
+			print(warn(u'\u2718'))
+		run_time = time.time() - start_time
+		run_time_m = str(int(run_time // 60)) + "m "if run_time // 60 > 0 else ""
+		run_time_s = str(int(run_time % 60)) + "s"
+		# not needed atm, cuz most test cases are under 1 sec
+		# print(bold("Run Time: ") + run_time_m + run_time_s + END)
+		print()
+
+	print(bold("Test cases passed:"), passed, "/", len(tests))
+	print("\033[36m======================================================" + END + "\n")
+	return passed, len(tests)
+
+def main():
+	if len(sys.argv) < 2: exit(warn("Please provide benchmark directory"))
+
+	benchmark_dir = sys.argv[1]
+	total_passed = 0
+	total = 0
+
+	sub_dir = glob.glob(benchmark_dir + "/*/")
+	if len(sub_dir):
+		for folder in sub_dir: 
+			passed, tests = run_folder(folder)
+			total_passed += passed
+			total += tests
+	else:
+		passed, tests = run_folder(benchmark_dir)
+		total_passed += passed
+		total += tests
+
+	if not total:
+		exit(warn("No test case directory exits under " + benchmark_dir))
+		
+	print(bold("Benchmark Summary:"), total_passed, "/", total, "({:.2f}%)".format((total_passed/total)*100))
+	print("\033[38m======================================================" + END + "\n")
+
+if __name__ == "__main__": main()

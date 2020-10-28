@@ -1,0 +1,144 @@
+#if DEBUG
+	.output CodeEqReceiverVar
+	.output IfCodeEqReceiver
+
+	#if VERBOSE
+		.output _ActionInTrueBranch
+		.output _ActionInFalseBranch
+		.output ActionInTrueBranch
+		.output ActionInFalseBranch
+		.output OverriddenTrueBranch
+		.output OverriddenFalseBranch
+	#endif
+#endif
+
+.output SeperationViolation
+
+
+/* Issues:
+1. Actions with same function body are identified as the same action.
+
+*/
+
+
+
+.decl CodeEqReceiverVar(var: Var)
+
+CodeEqReceiverVar(to):-
+	_AssignType(assign, to, "Ne"),
+	_AssignVar(assign, to, code_var),
+	_AssignVar(assign, to, receiver_var),
+	code_var != receiver_var,
+	pointer.VarPointsTo(code_var, "_code"),
+	pointer.VarPointsTo(receiver_var, "_self").
+
+CodeEqReceiverVar(to):-
+	CodeEqReceiverVar(from),
+	_AssignType(_, to, "Copy"),
+	_AssignVar(_, to, from).
+
+
+.decl IfCodeEqReceiver(if: Insn, true_br: Insn, false_br: Insn)
+
+IfCodeEqReceiver(if, true_br, false_br):-
+	CodeEqReceiverVar(to),
+	_Branch(if, true_br, false_br, to),
+	_FuncInsn("apply", if).
+
+
+/* Case (Simple: passed)
+	apply(){
+		if(code == receiver){
+			action(); // reachable from br1
+		}else{
+			action(); // reachable from br2 
+		}
+	}
+*/
+
+/* Case (False Positive: Fixed by restrict false branch)
+	apply(){
+		if(code == receiver){
+			action1();
+		}
+		action2(); // reachable from both br1 & br2
+	}
+	
+*/ 
+
+/* Case (Double Fence: Fixed by checking innermost condition)
+	apply(){
+		if(code == receiver && action == ""){
+			action();
+		}
+
+		if(code == receiver){
+			action();
+		}
+	}
+*/
+
+.decl _ActionInTrueBranch(if: Insn, br: Insn, call: Insn, action: Function)
+.decl _ActionInFalseBranch(if: Insn, br: Insn, call: Insn, action: Function)
+
+_ActionInTrueBranch(if, br, call, action):-
+	Action(call, action),
+	IfCodeEqReceiver(if, br, _),
+	ReachableInBB(br, call).
+
+_ActionInTrueBranch(if, br, call, action):-
+	Action(call, action),
+	IfCodeEqReceiver(if, br, _),
+	BasicBlockHead(callHead, call),
+	ReachableBtwBB(br, callHead).
+
+_ActionInFalseBranch(if, br, call, action):-
+	Action(call, action),
+	IfCodeEqReceiver(if, _, br),
+	ReachableInBB(br, call).
+
+// Restrict the false branch from merging back to main branch
+_ActionInFalseBranch(if, br, call, action):-
+	Action(call, action),
+	IfCodeEqReceiver(if, _, br),
+	BasicBlockHead(callHead, call),
+	DominateBB(br, callHead),
+	ReachableBtwBB(br, callHead).
+
+
+.decl OverriddenTrueBranch(br: Insn)
+.decl OverriddenFalseBranch(br: Insn)
+
+
+// The branch dominates other branch means it is overriden
+OverriddenTrueBranch(br):-
+	_ActionInTrueBranch(_, br, _, action),
+	_ActionInFalseBranch(_, br_2, _, action),
+	DominateBB(br, br_2).
+
+OverriddenFalseBranch(br):-
+	_ActionInFalseBranch(_, br, _, action),
+	_ActionInTrueBranch(_, br_2, _, action),
+	DominateBB(br, br_2).
+
+
+
+.decl ActionInTrueBranch(if: Insn, action: Function)
+.decl ActionInFalseBranch(if: Insn, action: Function)
+
+ActionInTrueBranch(if, action):-
+	_ActionInTrueBranch(if, br, _, action),
+	!OverriddenTrueBranch(br).
+
+
+ActionInFalseBranch(if, action):-
+	_ActionInFalseBranch(if, br, _, action),
+	!OverriddenFalseBranch(br).
+
+
+.decl SeperationViolation(action: Function)
+
+SeperationViolation(action):-
+	ActionInTrueBranch(if, action),
+	ActionInFalseBranch(if, action).
+	

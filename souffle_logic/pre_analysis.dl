@@ -1,0 +1,190 @@
+/* EOS related pre-analysis 
+e.g.	Actions, DBInsn etc
+*/
+
+#if DEBUG
+	#if VERBOSE
+		.output CheckTransfer
+		.output CheckEOSIO
+		.output DBRemove
+		.output _DBInsn
+		.output ActionData
+	#endif
+	.output Action
+	.output ActionParam
+	.output ActionFuncReachable
+	.output OnTransferAction
+	.output OnTransferEOSAction
+	.output DBAction
+	.output DBInsn
+#endif
+
+/* Action Related */
+.decl Action(call: Insn, action: Function)
+
+Action(insn, action):-
+	_FuncCall(insn, "apply", action),
+	_FuncCall(_, action, "read_action_data"). 
+
+
+
+/* Action Parameters */
+.decl ActionData(action: Function, var: Var)
+
+ActionData(action, var):-
+	Action(_, action),
+	_MemCopy(insn, var, _),
+	_FuncInsn(action, insn).
+	
+
+.comp Order<Sort, Node>{
+	.decl Nodes(sort: Sort, node: Node)
+	.decl Less(sort: Sort, x: Node, y: Node)
+	.decl Leg(sort: Sort, x: Node, y: Node)
+	.decl Next(sort: Sort, x: Node, y: Node)
+	.decl First(sort: Sort, x: Node)
+	.decl Last(sort: Sort, x: Node)
+
+	Less(s, x, y):-
+		Nodes(s, x),
+		Nodes(s, y),
+		to_number(x) < to_number(y).
+
+	Leg(s, x, z):-
+		Less(s, x, y),
+		Less(s, y, z).
+
+	Next(s, x, y):-
+		Less(s, x, y),
+		!Leg(s, x, y).
+
+	First(s, x):-
+		Nodes(s, x),
+		!Less(s, _, x).
+
+	Last(s, x):-
+		Nodes(s, x),
+		!Less(s, x, _).
+}
+
+.decl _ActionParam(action: Function, base: Var, offset: symbol)
+
+_ActionParam(action, base, num):-
+	ActionData(action, data),
+	_AssignVar(_, data, var),
+	_AssignType(_, var, "Copy"),
+	_AssignVar(_, var, base),
+	_AssignVar(_, data, offset),
+	_AssignType(_, offset, "Const"),
+	_SimpleAssign(_, offset, num).
+
+// re-order the parameter to get the index
+.init order = Order<Function, symbol>
+
+order.Nodes(action, num):-
+	_ActionParam(action, _, num).
+
+.decl ActionParam(action: Function, base: Var, offset: symbol, index: number)
+ActionParam(action, base, offset, 0):-
+	_ActionParam(action, base, offset),
+	order.Last(action, offset).
+
+ActionParam(action, base, offset, n+1):-
+	ActionParam(action, base, next, n),
+	order.Next(action, offset, next).
+
+
+
+/* Action Reachable */
+.decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
+
+ActionFuncReachable(action, to, insn):-
+	Action(_, action),
+	_FuncCall(insn, action, to).
+
+ActionFuncReachable(action, to, insn):-
+	ActionFuncReachable(action, mid, _),
+	_FuncCall(insn, mid, to).
+
+
+/* Type of Action */
+
+.decl CheckTransfer(insn: Insn, toBranch: Insn)
+
+CheckTransfer(insn, toBranch):-
+	_SimpleAssign(_, transferVar, "-3.6171687602778276E18"),
+	_AssignVar(_, ifVar, transferVar),
+	_Branch(insn, _, toBranch, ifVar).
+
+.decl CheckEOSIO(insn: Insn, toBranch: Insn)
+
+CheckEOSIO(insn, toBranch):-
+	_SimpleAssign(_, transferVar, "6.1386635915927654E18"),
+	_AssignVar(_, ifVar, transferVar),
+	_Branch(insn, _, toBranch, ifVar).
+
+
+.decl OnTransferAction(call: Insn, action: Function)
+
+OnTransferAction(call, action):-
+	Action(call, action),
+	CheckTransfer(_, toBranch),
+	BasicBlockHead(toBranch, call).
+
+.decl OnTransferEOSAction(call: Insn, action: Function)
+OnTransferEOSAction(call, action):-
+	OnTransferAction(call, action),
+	BasicBlockHead(callHead, call), 
+	CheckEOSIO(_, checkedHead),
+	DominateBB(checkedHead, callHead).
+
+
+.decl DBAction(action: Function)
+
+DBAction(action):-
+	DBInsn(dbInsn, _),
+	ActionFuncReachable(action, _, dbInsn).
+
+
+/* DB Related */
+
+// DB Remove
+// Unlikely called without DB find
+// So only consider the find and remove that can be called from the same action
+
+.decl DBRemove(insn: Insn, payer: Var)
+
+DBRemove(removeInsn, payer):-
+	ActionFuncReachable(action, "db_remove_i64", removeInsn),
+	ActionFuncReachable(action, "db_find_i64", findInsn),
+	_ActualArgs(findInsn, _, 3, payer).
+
+
+.decl _DBInsn(insn: Insn, payer: Var)
+
+_DBInsn(insn, payer):-
+	_DBStore(insn, _, payer, _, _);
+	_DBUpdate(insn, _, payer, _);
+	DBRemove(insn, payer).
+
+
+.decl DBInsn(insn: Insn, payer: Var)
+
+// if dbOp on self
+DBInsn(insn, "_self"):-
+	_DBInsn(insn, payer),
+	pointer.VarPointsTo(payer,"_self").
+
+// if dbOp on code
+DBInsn(insn, "_code"):-
+	_DBInsn(insn, payer),
+	pointer.VarPointsTo(payer,"_code"),
+	!pointer.VarPointsTo(payer,"_self").
+
+// else
+DBInsn(insn, payer):-
+	_DBInsn(insn, payer),
+	!pointer.VarPointsTo(payer,"_code"),
+	!pointer.VarPointsTo(payer,"_self").
+
+

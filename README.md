@@ -31,3 +31,22 @@ Then with all the relevant input facts in the "artefacts" directory, you can run
 ```sh
 souffle -F artefacts/souffle-0c52e085-3252-4a82-826e-366f0ba7c6e3 -D artefacts/souffle-0c52e085-3252-4a82-826e-366f0ba7c6e3_OUT/ smt_files/analysis.dl
 ```
+
+#### Bash script usage
+1. Grant Permission
+```sh
+inspect-analysis2$ chomod +x inspect trans run_test
+```
+2. Run inspect (decompiler + analysis in datalog)
+```sh
+inspect-analysis2$ ./inspect foo.wasm
+```
+3. Print out the decompiled program to the terminal (For debugging purpose and only one will be printed)
+```sh
+inspect-analysis2$ ./trans
+```
+4. Run test suite
+```sh
+inspect-analysis2$ ./run_test path/to/benchmark/
+```
+"benchmark" should be a directory with sub-directories storing assorted test cases(.wasm) with according expected output files(.out). The script will generate expected output from actual output if one does not exist.
