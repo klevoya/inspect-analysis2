@@ -29,6 +29,7 @@ public:
   }
 
   ACTION emplaceuser(name username, const std::string &display_name) {
+    require_auth(username);
     _users.emplace(get_self(), [&](auto &new_user) {
       new_user.username = username;
       new_user.display_name = display_name;
