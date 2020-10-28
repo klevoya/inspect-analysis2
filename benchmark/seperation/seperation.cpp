@@ -18,11 +18,14 @@ CONTRACT Seperation : public contract {
 
 extern "C" {
   void apply(uint64_t receiver, uint64_t code, uint64_t action) {
-    if (code == receiver) {
-      switch (action) { EOSIO_DISPATCH_HELPER(Seperation, (playgame)) }
-    }else{
+    if(code == receiver){
      execute_action(name(receiver), name(code), &Seperation::playgame);
     }
+
+    if ( receiver != code && action == name("transfer").value) {
+      switch (action) { EOSIO_DISPATCH_HELPER(Seperation, (playgame)) }
+    }
+
    }
 }
 

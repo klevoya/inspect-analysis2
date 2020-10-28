@@ -4,12 +4,12 @@ e.g.	Actions, DBInsn etc
 
 #if DEBUG
 	#if VERBOSE
-		.output ActionFuncReachable
 		.output CheckTransfer
 		.output CheckEOSIO
 		.output DBRemove
 	#endif
 	.output Action
+	.output ActionFuncReachable
 	.output OnTransferAction
 	.output OnTransferEOSAction
 	.output DBAction

@@ -54,32 +54,51 @@ def run_n_check(file):
 
 	return check_diff(expected, actual)
 
+def run_folder(folder):
+	print("Running folder:", bold(folder))
+	tests = glob.glob1(folder,"*.wasm")
+
+	passed = 0
+	for test in tests:
+		start_time = time.time()
+		if run_n_check(folder + test):
+			print(good(u'\u2713'))
+			passed += 1
+		else:
+			print(warn(u'\u2718'))
+		run_time = time.time() - start_time
+		run_time_m = str(int(run_time // 60)) + "m "if run_time // 60 > 0 else ""
+		run_time_s = str(int(run_time % 60)) + "s"
+		# not needed atm, cuz most test cases are under 1 sec
+		# print(bold("Run Time: ") + run_time_m + run_time_s + END)
+		print()
+
+	print(bold("Test cases passed:"), passed, "/", len(tests))
+	print("\033[36m======================================================" + END + "\n")
+	return passed, len(tests)
 
 def main():
 	if len(sys.argv) < 2: exit(warn("Please provide benchmark directory"))
 
 	benchmark_dir = sys.argv[1]
-	for folder in glob.glob(benchmark_dir + "/*/"): 
-		print("Running folder:", bold(folder))
-		tests = glob.glob1(folder,"*.wasm")
+	total_passed = 0
+	total = 0
 
-		passed = 0
-		for test in tests:
-			start_time = time.time()
-			if run_n_check(folder + test):
-				print(good(u'\u2713'))
-				passed += 1
-			else:
-				print(warn(u'\u2718'))
-			run_time = time.time() - start_time
-			run_time_m = str(int(run_time // 60)) + "m "if run_time // 60 > 0 else ""
-			run_time_s = str(int(run_time % 60)) + "s"
-			# not needed atm, cuz most test cases are under 1 sec
-			# print(bold("Run Time: ") + run_time_m + run_time_s + END)
-			print()
+	sub_dir = glob.glob(benchmark_dir + "/*/")
+	if len(sub_dir):
+		for folder in sub_dir: 
+			passed, tests = run_folder(folder)
+			total_passed += passed
+			total += tests
+	else:
+		passed, tests = run_folder(benchmark_dir)
+		total_passed += passed
+		total += tests
 
-		print(bold("Test cases passed:"), passed, "/", len(tests))
-		print("\033[36m======================================================" + END + "\n")
-
+	if not total:
+		exit(warn("No test case directory exits under " + benchmark_dir))
+		
+	print(bold("Benchmark Summary:"), total_passed, "/", total, "({:.2f}%)".format((total_passed/total)*100))
+	print("\033[38m======================================================" + END + "\n")
 
 if __name__ == "__main__": main()
