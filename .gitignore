@@ -8,4 +8,4 @@ logs/
 database/
 benchmark/BancorX
 profile
-*.abi
+**.abi
