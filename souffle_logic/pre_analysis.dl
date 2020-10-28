@@ -7,6 +7,7 @@ e.g.	Actions, DBInsn etc
 		.output CheckTransfer
 		.output CheckEOSIO
 		.output DBRemove
+		.output _DBInsn
 	#endif
 	.output Action
 	.output ActionFuncReachable
@@ -100,18 +101,18 @@ _DBInsn(insn, payer):-
 // if dbOp on self
 DBInsn(insn, "_self"):-
 	_DBInsn(insn, payer),
-	pointer.self.VarPointsToParam(payer).
+	pointer.VarPointsTo(payer,"_self").
 
 // if dbOp on code
 DBInsn(insn, "_code"):-
 	_DBInsn(insn, payer),
-	pointer.code.VarPointsToParam(payer),
-	!pointer.self.VarPointsToParam(payer).
+	pointer.VarPointsTo(payer,"_code"),
+	!pointer.VarPointsTo(payer,"_self").
 
 // else
 DBInsn(insn, payer):-
 	_DBInsn(insn, payer),
-	!pointer.self.VarPointsToParam(payer),
-	!pointer.code.VarPointsToParam(payer).
+	!pointer.VarPointsTo(payer,"_code"),
+	!pointer.VarPointsTo(payer,"_self").
 
 

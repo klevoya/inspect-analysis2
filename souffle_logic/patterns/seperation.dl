@@ -8,7 +8,7 @@
 		.output _ActionInTrueBranch
 		.output _ActionInFalseBranch
 		.output OverriddenTrueBranch
-		.ouput OverriddenFalseBranch
+		.output OverriddenFalseBranch
 	#endif
 #endif
 

@@ -11,7 +11,7 @@ CONTRACT no_auth_remove : public contract {
       void transfer(name user) {
         people_index people(get_first_receiver(), get_first_receiver().value);
 
-        require_auth(user);
+        // require_auth(user);
         auto itr = people.find(user.value);
         people.erase( itr );
       }
