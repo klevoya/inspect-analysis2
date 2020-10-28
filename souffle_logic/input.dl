@@ -11,9 +11,6 @@ GET_REL_FROM_FILE(_DBStore, "must/dbstore.facts")
 .decl _DBUpdate(insn: Insn, itr: Var, payer: Var, data: Var)
 GET_REL_FROM_FILE(_DBUpdate, "must/dbupdate.facts")
 
-// .decl _DBRemove(insn: Insn, itr:Var)
-// GET_REL_FROM_FILE(_DBRemove, "must/dbremove.facts")
-
 .decl _AssignVar(insn: Insn, to: Var, from: Var)
 GET_REL_FROM_FILE(_AssignVar, "must/assignVar.facts")
 
@@ -62,10 +59,13 @@ GET_REL_FROM_FILE(_FuncCall, "must/fnCall.facts")
 GET_REL_FROM_FILE(_FormalArgs, "must/fnDefinitionArgument.facts")
 
 // For a formal function definition. Return value of the function.
-.decl _FormalReturn   (funcDef:Insn, func: Function, return: Var)
+.decl _FormalReturn(funcDef:Insn, func: Function, return: Var)
 GET_REL_FROM_FILE(_FormalReturn, "must/fnDefinitionRtn.facts")
 
 // Captures the actual return value at the invocation of a function
-.decl _ActualReturn   (callSite: Insn, func: Function, return: Var)
+.decl _ActualReturn(callSite: Insn, func: Function, return: Var)
 GET_REL_FROM_FILE(_ActualReturn, "must/fnCallRtn.facts")
+
+.decl _MemCopy(insn: Insn, to:Var, from:Var)
+GET_REL_FROM_FILE(_MemCopy, "must/memcpy.facts")
 

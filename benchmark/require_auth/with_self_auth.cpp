@@ -11,8 +11,8 @@ CONTRACT with_self_auth : public contract {
       void transfer(name user, uint64_t quantity) {
         people_index people(get_first_receiver(), get_first_receiver().value);
 
-        require_auth(get_self());
-        people.emplace(user, [&]( auto& row ) {
+        require_auth(user);
+        people.emplace(get_self(), [&]( auto& row ) {
           row.key = user;
           row.balance = quantity;
         });

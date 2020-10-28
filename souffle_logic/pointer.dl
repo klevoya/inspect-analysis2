@@ -10,6 +10,7 @@
 		.output ExtendedCopyAssign
 		.output ExtendedVarPointsTo
 	#endif
+	.output LoadActionParam
 	.output VarPointsTo
 #endif
 
@@ -46,28 +47,81 @@ IntraCopyAssign(insn, to, from):-
 	_AssignType(insn, to, "Copy"),
 	to != "$a".
 
-// load mapping, very crude but enough for checking alias
+
+
+// taint for action parameter
+
+.decl LoadActionParam(insn: Insn, to: Var, from: Var)
+
+LoadActionParam(insn, to, cat(cat(action, "_"), to_string(index))):-
+	_Load(insn, from, offset, to),
+	_AssignVar(_, from, base),
+	ActionParam(action, base, offset_symbol, index),
+	offset = to_number(offset_symbol).
+
+
+// sepcial VarPointsTo for action param to avoid double negation
+.decl _VarPointsTo(var1: Var, var2: Var)
+
+_VarPointsTo(var, var):-
+	RootVar(var).
+
+// Copys
+_VarPointsTo(to, var):-
+	_InterCopyAssign(to, from),
+	_VarPointsTo(from, var).
+
+.decl StoreActionParam(address: Var, offset: number, var: Var)
+
+StoreActionParam(address, offset, to):-
+	_VarPointsTo(var, to),
+	LoadActionParam(_, _, to),
+	_Store(_, address_var, offset, var), 
+	_AssignVar(_, address_var, address).
+
+.decl StoreLoadActionParam(insn: Insn, to: Var, from: Var)
+
+StoreLoadActionParam(insn, to, from):-
+	LoadActionParam(insn, to, from).
+
+StoreLoadActionParam(insn, to, from):-
+	StoreActionParam(address, offset, from),
+	_Load(insn, address_var, offset, to),
+	_AssignVar(_, address_var, address).
+
+
+// load action parameters
+RootVar(from),
 IntraCopyAssign(insn, to, from):-
-	_Load(insn, from, _, to).
+	StoreLoadActionParam(insn, to, from).
 
 
+// intermediate for action param to avoid double negation
+.decl _InterCopyAssign(to: Var, from: Var)
+
+_InterCopyAssign(to, from):-
+	IntraCopyAssign(_, to, from).
+
+// argument mapping
+_InterCopyAssign(to, from):-
+	_ActualArgs(_, func, index, from),
+	_FormalArgs(_, func, index, to).
+
+// return value mapping
+_InterCopyAssign(to, from):-
+	_FormalReturn(_, func, from),
+	_ActualReturn(_, func, to).
 
 // copys include mapping through parameters and return values
 .decl InterCopyAssign(to: Var, from: Var)
 
 InterCopyAssign(to, from):-
-	IntraCopyAssign(_, to, from).
+	_InterCopyAssign(to, from).
 
-// argument mapping
+// load mapping, very crude but enough for checking alias
 InterCopyAssign(to, from):-
-	_ActualArgs(_, func, index, from),
-	_FormalArgs(_, func, index, to).
-
-// return value mapping
-InterCopyAssign(to, from):-
-	_FormalReturn(_, func, from),
-	_ActualReturn(_, func, to).
-
+	_Load(insn, from, _, to),
+	!StoreLoadActionParam(insn, _, _).
 
 
 
@@ -150,24 +204,29 @@ ExtendedVarPointsTo(to, var):-
 	StoreLoadParam(storeInsn, loadInsn, loadTo):-
 		StoreParam(storeInsn, storeOffset),
 		_Load(loadInsn, loadOffset, _, loadTo),
+		!StoreLoadActionParam(loadInsn, _, _),
 		ExtendedVarPointsTo(storeOffset, to),
 		ExtendedVarPointsTo(loadOffset, to).
 
 
+	VarPointsToParam(var):-
+		StoreLoadParam(_, _, var).
+
+	// may not be useful
 
 	// reachable from store to load
-	.init store_dom_load = CFGDom
+	// .init store_dom_load = CFGDom
 
-	store_dom_load.Src(insn):-
-		StoreParam(insn, _).
+	// store_dom_load.Src(insn):-
+	// 	StoreParam(insn, _).
 
-	store_dom_load.Target (insn):-
-		StoreLoadParam(_, insn, _).
+	// store_dom_load.Target (insn):-
+	// 	StoreLoadParam(_, insn, _).
 
-	VarPointsToParam(var):-
-		StoreLoadParam(store, load, var),
-		(store_dom_load.IntraSrcDomTarget(store, load);
-		store_dom_load.InterSrcDomTarget(store, load)).
+	// VarPointsToParam(var):-
+	// 	StoreLoadParam(store, load, var),
+	// 	(store_dom_load.IntraSrcDomTarget(store, load);
+	// 	store_dom_load.InterSrcDomTarget(store, load)).
 }
 
 // Taint self(reciever)
@@ -179,14 +238,18 @@ self.VarPointsToParam(var):-
 self.VarPointsToParam(var):-
 	_ActualReturn(_, "current_receiver", var).
 
-VarPointsTo(var, "_self"):-
-	self.VarPointsToParam(var).
 
 // Taint code
 .init code = ApplyParam
 
 code.VarPointsToParam(var):-
 		_FormalArgs(_, "apply", 1, var).
+
+
+
+
+VarPointsTo(var, "_self"):-
+	self.VarPointsToParam(var).
 
 VarPointsTo(var, "_code"):-
 	code.VarPointsToParam(var).

@@ -1,12 +1,12 @@
 #if DEBUG
 	.output CodeEqReceiverVar
 	.output IfCodeEqReceiver
-	.output ActionInTrueBranch
-	.output ActionInFalseBranch
 
 	#if VERBOSE
 		.output _ActionInTrueBranch
 		.output _ActionInFalseBranch
+		.output ActionInTrueBranch
+		.output ActionInFalseBranch
 		.output OverriddenTrueBranch
 		.output OverriddenFalseBranch
 	#endif

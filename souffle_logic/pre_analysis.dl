@@ -8,8 +8,10 @@ e.g.	Actions, DBInsn etc
 		.output CheckEOSIO
 		.output DBRemove
 		.output _DBInsn
+		.output ActionData
 	#endif
 	.output Action
+	.output ActionParam
 	.output ActionFuncReachable
 	.output OnTransferAction
 	.output OnTransferEOSAction
@@ -25,6 +27,75 @@ Action(insn, action):-
 	_FuncCall(_, action, "read_action_data"). 
 
 
+
+/* Action Parameters */
+.decl ActionData(action: Function, var: Var)
+
+ActionData(action, var):-
+	Action(_, action),
+	_MemCopy(insn, var, _),
+	_FuncInsn(action, insn).
+	
+
+.comp Order<Sort, Node>{
+	.decl Nodes(sort: Sort, node: Node)
+	.decl Less(sort: Sort, x: Node, y: Node)
+	.decl Leg(sort: Sort, x: Node, y: Node)
+	.decl Next(sort: Sort, x: Node, y: Node)
+	.decl First(sort: Sort, x: Node)
+	.decl Last(sort: Sort, x: Node)
+
+	Less(s, x, y):-
+		Nodes(s, x),
+		Nodes(s, y),
+		to_number(x) < to_number(y).
+
+	Leg(s, x, z):-
+		Less(s, x, y),
+		Less(s, y, z).
+
+	Next(s, x, y):-
+		Less(s, x, y),
+		!Leg(s, x, y).
+
+	First(s, x):-
+		Nodes(s, x),
+		!Less(s, _, x).
+
+	Last(s, x):-
+		Nodes(s, x),
+		!Less(s, x, _).
+}
+
+.decl _ActionParam(action: Function, base: Var, offset: symbol)
+
+_ActionParam(action, base, num):-
+	ActionData(action, data),
+	_AssignVar(_, data, var),
+	_AssignType(_, var, "Copy"),
+	_AssignVar(_, var, base),
+	_AssignVar(_, data, offset),
+	_AssignType(_, offset, "Const"),
+	_SimpleAssign(_, offset, num).
+
+// re-order the parameter to get the index
+.init order = Order<Function, symbol>
+
+order.Nodes(action, num):-
+	_ActionParam(action, _, num).
+
+.decl ActionParam(action: Function, base: Var, offset: symbol, index: number)
+ActionParam(action, base, offset, 0):-
+	_ActionParam(action, base, offset),
+	order.Last(action, offset).
+
+ActionParam(action, base, offset, n+1):-
+	ActionParam(action, base, next, n),
+	order.Next(action, offset, next).
+
+
+
+/* Action Reachable */
 .decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
 
 ActionFuncReachable(action, to, insn):-
@@ -36,6 +107,7 @@ ActionFuncReachable(action, to, insn):-
 	_FuncCall(insn, mid, to).
 
 
+/* Type of Action */
 
 .decl CheckTransfer(insn: Insn, toBranch: Insn)
 
