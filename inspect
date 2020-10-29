@@ -22,3 +22,9 @@ cat database/FakeTokenViolation.csv
 
 echo -e "\nSeperation Violation: "
 cat database/SeperationViolation.csv
+
+echo -e "\nFake Notification Violation: "
+cat database/FakeNotifyViolation.csv
+
+echo -e "\nNumeric Overflow Violation: "
+cat database/OverflowViolation.csv

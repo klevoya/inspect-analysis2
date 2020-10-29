@@ -1,0 +1,44 @@
+#if DEBUG
+	.output PossibleOverflow
+	.output OverflowCheck
+	.output UnderflowCheck
+#endif
+
+.output OverflowViolation
+
+.decl PossibleOverflow(insn: Insn, var: Var)
+
+PossibleOverflow(insn, result):-
+	(_AssignType(insn, result, "Sub");
+	_AssignType(insn, result, "Add")),
+	_AssignVar(insn, result, var),
+	AllActionParam(_, _, param),
+	pointer.VarPointsTo(var, param).
+
+
+.decl OverflowCheck(var:Var)
+
+OverflowCheck(result):-
+	PossibleOverflow(_, result),
+	pointer.VarPointsTo(var, result),
+	_AssignType(_, bool, "LeX"),
+	_AssignVar(_, bool, var),
+	_AssignVar(_, bool, other),
+	_SimpleAssign(_, other, "-4.6116860184273879E18").
+
+.decl UnderflowCheck(var:Var)
+UnderflowCheck(result):-
+	PossibleOverflow(_, result),
+	pointer.VarPointsTo(var, result),
+	_AssignType(_, bool, "LtX"),
+	_AssignVar(_, bool, var),
+	_AssignVar(_, bool, other),
+	_SimpleAssign(_, other, "4.6116860184273879E18").
+
+
+.decl OverflowViolation(insn: Insn)
+
+OverflowViolation(insn):-
+	PossibleOverflow(insn, result),
+	(!OverflowCheck(result);
+	!UnderflowCheck(result)).

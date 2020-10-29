@@ -12,6 +12,7 @@ e.g.	Actions, DBInsn etc
 	#endif
 	.output Action
 	.output ActionParam
+	.output AllActionParam
 	.output ActionFuncReachable
 	.output OnTransferAction
 	.output OnTransferEOSAction
@@ -75,7 +76,6 @@ _ActionParam(action, base, num):-
 	_AssignType(_, var, "Copy"),
 	_AssignVar(_, var, base),
 	_AssignVar(_, data, offset),
-	_AssignType(_, offset, "Const"),
 	_SimpleAssign(_, offset, num).
 
 // re-order the parameter to get the index
@@ -85,6 +85,7 @@ order.Nodes(action, num):-
 	_ActionParam(action, _, num).
 
 .decl ActionParam(action: Function, base: Var, offset: symbol, index: number)
+
 ActionParam(action, base, offset, 0):-
 	_ActionParam(action, base, offset),
 	order.Last(action, offset).
@@ -93,7 +94,11 @@ ActionParam(action, base, offset, n+1):-
 	ActionParam(action, base, next, n),
 	order.Next(action, offset, next).
 
+// easy to access action parameter name
+.decl AllActionParam(action: Function, index: number, name: Var)
 
+AllActionParam(action, index, cat(cat(action, "_"), to_string(index))):-
+	ActionParam(action, _, _, index).
 
 /* Action Reachable */
 .decl ActionFuncReachable(from: Function, to: Function, insn: Insn)

@@ -1,6 +1,6 @@
 #if DEBUG
 	.output PossibleFakeToken
-	.output ManualCheck
+	.output CheckFakeToken
 #endif
 
 .output FakeTokenViolation
@@ -20,9 +20,9 @@ PossibleFakeToken(action):-
 	OnTransferAction(call, action),
 	!OnTransferEOSAction(call, action).
 
-.decl ManualCheck(insn: Insn)
+.decl CheckFakeToken(insn: Insn)
 
-ManualCheck(insn):-
+CheckFakeToken(insn):-
 	_AssignType(insn, to, "Ne"),
 	_AssignVar(insn, to, from),
 	pointer.code.VarPointsToParam(from).
@@ -34,13 +34,13 @@ ManualCheck(insn):-
 SafeToken(action):-
 	PossibleFakeToken(action),
 	_FuncInsn(action, insn),
-	ManualCheck(insn).
+	CheckFakeToken(insn).
 
 SafeToken(action):-
 	PossibleFakeToken(action),
 	ActionFuncReachable(action, func, _),
 	_FuncInsn(func, insn),
-	ManualCheck(insn).
+	CheckFakeToken(insn).
 
 .decl FakeTokenViolation(action: Function)
 FakeTokenViolation(action):-

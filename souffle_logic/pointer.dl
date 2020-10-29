@@ -53,11 +53,12 @@ IntraCopyAssign(insn, to, from):-
 
 .decl LoadActionParam(insn: Insn, to: Var, from: Var)
 
-LoadActionParam(insn, to, cat(cat(action, "_"), to_string(index))):-
+LoadActionParam(insn, to, name):-
 	_Load(insn, from, offset, to),
 	_AssignVar(_, from, base),
 	ActionParam(action, base, offset_symbol, index),
-	offset = to_number(offset_symbol).
+	offset = to_number(offset_symbol),
+	AllActionParam(action, index, name).
 
 
 // sepcial VarPointsTo for action param to avoid double negation

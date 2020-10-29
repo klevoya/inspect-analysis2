@@ -13,7 +13,9 @@
 #include "patterns/auth.dl"
 #include "patterns/rollback.dl"
 #include "patterns/fake_token.dl"
+#include "patterns/fake_notify.dl"
 #include "patterns/seperation.dl"
+#include "patterns/overflow.dl"
 
 
 // Final Results for test suite
@@ -31,3 +33,9 @@ Result("FakeToken", num):-
 
 Result("Seperation", num):-
 	num = count : SeperationViolation(_).
+
+Result("FakeNotify", num):-
+	num = count : FakeNotifyViolation(_).
+
+Result("Overflow", num):-
+	num = count : OverflowViolation(_).
