@@ -9,8 +9,11 @@
 		.output ExtendedRootVar
 		.output ExtendedCopyAssign
 		.output ExtendedVarPointsTo
+		.output LoadActionParam
+		.output StoreActionParamAddress
+		.output StoreLoadActionParamAddress
 	#endif
-	.output LoadActionParam
+	.output StoreLoadActionParam
 	.output VarPointsTo
 #endif
 
@@ -53,6 +56,7 @@ IntraCopyAssign(insn, to, from):-
 
 .decl LoadActionParam(insn: Insn, to: Var, from: Var)
 
+// direct load action data from memcpy
 LoadActionParam(insn, to, name):-
 	_Load(insn, from, offset, to),
 	_AssignVar(_, from, base),
@@ -72,6 +76,7 @@ _VarPointsTo(to, var):-
 	_InterCopyAssign(to, from),
 	_VarPointsTo(from, var).
 
+// store action data directly
 .decl StoreActionParam(address: Var, offset: number, var: Var)
 
 StoreActionParam(address, offset, to):-
@@ -80,8 +85,48 @@ StoreActionParam(address, offset, to):-
 	_Store(_, address_var, offset, var), 
 	_AssignVar(_, address_var, address).
 
+// store the address that can point to action data
+.decl StoreActionParamAddress (dyn_offset: Var, offset: number, address_var: Var, param: Var)
+
+StoreActionParamAddress(dyn_offset, offset, address_var, param):-
+	// the store statement for dynOffset
+	_Store(_, dyn_offset, offset, address_var), 
+	// the store statement for action param
+	StoreActionParam(stored_dyn_offset_1, stored_offset, param),
+	_AssignType(_,address_var, "Add"),
+	// address points to the same place
+	_AssignVar(_,address_var, stored_dyn_offset_2),
+	_VarPointsTo(stored_dyn_offset_1, var),
+	_VarPointsTo(stored_dyn_offset_2, var),
+	// the stored offset is same
+	_AssignVar(_,address_var, offset_var),
+	_SimpleAssign(_, offset_var, num),
+	stored_offset = to_number(num).
+	
+
+// store + load by calculating offset for stored address
+.decl StoreLoadActionParamAddress(insn: Insn, to: Var, stored_address: Var, param: Var)
+
+// load_dyn_offset_root = load_dyn_offset + offset_var
+// ..... load_dyn_offset_var <- load_dyn_offset_root
+// load(load_dyn_offset_var + load_offset)
+StoreLoadActionParamAddress(insn, to, stored_address, param):-
+	StoreActionParamAddress(store_dyn_offset, stor_offset, stored_address, param),
+	_Load(insn, load_dyn_offset_var, load_offset, to),
+	_VarPointsTo(load_dyn_offset_var, load_dyn_offset_root),
+	_AssignType(_,load_dyn_offset_root, "Add"),
+	_AssignVar(_, load_dyn_offset_root, load_dyn_offset),
+	_VarPointsTo(load_dyn_offset, var),
+	_VarPointsTo(store_dyn_offset, var),
+	_AssignVar(_, load_dyn_offset_root, offset_var),
+	_SimpleAssign(_, offset_var, offset),
+	stor_offset = to_number(offset) + load_offset.
+
+
+
 .decl StoreLoadActionParam(insn: Insn, to: Var, from: Var)
 
+// store + load action data by directly mataching offset
 StoreLoadActionParam(insn, to, from):-
 	LoadActionParam(insn, to, from).
 
@@ -89,6 +134,15 @@ StoreLoadActionParam(insn, to, from):-
 	StoreActionParam(address, offset, from),
 	_Load(insn, address_var, offset, to),
 	_AssignVar(_, address_var, address).
+
+
+// store + load for loading from stored address
+StoreLoadActionParam(insn, to, stored_address):-
+	StoreLoadActionParamAddress(insn, to, stored_address, _).
+
+StoreLoadActionParam(insn, to, param):-
+	StoreLoadActionParamAddress(_, address, _, param),
+	_Load(insn, address, 0, to).
 
 
 // load action parameters
