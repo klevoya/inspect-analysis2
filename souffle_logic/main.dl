@@ -31,11 +31,11 @@ Result("Rollback", num):-
 Result("FakeToken", num):-
 	num = count : FakeTokenViolation(_).
 
-Result("Seperation", num):-
-	num = count : SeperationViolation(_).
-
 Result("FakeNotify", num):-
 	num = count : FakeNotifyViolation(_).
+
+Result("Seperation", num):-
+	num = count : SeperationViolation(_).
 
 Result("Overflow", num):-
 	num = count : OverflowViolation(_).

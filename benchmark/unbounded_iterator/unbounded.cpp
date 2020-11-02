@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-CONTRACT Unbounded : public contract {
+CONTRACT unbounded : public contract {
   public:
       using contract::contract;
       [[eosio::action]]

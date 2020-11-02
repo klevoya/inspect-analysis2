@@ -4,7 +4,7 @@
 using namespace eosio;
 
 
-CONTRACT Rollback : public contract {
+CONTRACT rollback_self : public contract {
   public:
       using contract::contract;
 

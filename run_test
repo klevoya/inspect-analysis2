@@ -3,8 +3,10 @@ import sys,os,glob
 import subprocess
 import time
 import csv
+import argparse
 
 
+args = None
 END = "\033[0m"
 
 def warn(line):
@@ -23,7 +25,7 @@ def bold(line):
 def check_diff(expected, actual):
 	passed = True
 	actual = open(actual, mode='r').readlines()
-	if not os.path.isfile(expected): 
+	if not os.path.isfile(expected) or args.create: 
 		print(warn("Expected output file " + expected + " does not exist."))
 		print("Creating from actual output...")
 		with open(expected, 'w') as f:
@@ -78,9 +80,16 @@ def run_folder(folder):
 	return passed, len(tests)
 
 def main():
+	global args
+
 	if len(sys.argv) < 2: exit(warn("Please provide benchmark directory"))
 
-	benchmark_dir = sys.argv[1]
+	parser = argparse.ArgumentParser()
+	parser.add_argument('dir')
+	parser.add_argument("-c", "--create", help="Creating all expected file from the actual output", action='store_true')
+	args = parser.parse_args()
+
+	benchmark_dir = args.dir
 	total_passed = 0
 	total = 0
 

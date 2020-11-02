@@ -7,10 +7,10 @@ using namespace eosio;
 
 static constexpr symbol EOS_SYMBOL = symbol("EOS", 4);
 
-CONTRACT forgedtoken : public contract {
+CONTRACT checked_forgedtoken : public contract {
 public:
   using contract::contract;
-  forgedtoken(eosio::name receiver, eosio::name code, eosio::datastream<const char*> ds)
+  checked_forgedtoken(eosio::name receiver, eosio::name code, eosio::datastream<const char*> ds)
       : contract(receiver, code, ds) {}
 
   [[eosio::on_notify("*::transfer")]] void on_transfer(
