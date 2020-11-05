@@ -81,4 +81,31 @@ public:
       new_user.display_name = display_name;
     });
   }
+
+  ACTION updateself4(name dummy, name username, const std::string &display_name) {
+    check(get_self() == name("test"), "wrong account");
+
+    upsert_helper(username, display_name);
+  }
+
+  // safe
+  ACTION updateself5(name dummy, const std::string &display_name, name username) {
+    require_auth(username);
+
+    upsert_helper(username, display_name);
+  }
+
+  __attribute__((noinline)) void upsert_helper(name username, std::string display_name) {
+    auto itr = _users.find(username.value);
+    if (itr != _users.end()) {
+      _users.emplace(username, [&](auto &new_user) {
+        new_user.username = username;
+        new_user.display_name = display_name;
+      });
+    } else {
+      _users.modify(itr, username, [&](auto &new_user) {
+        new_user.display_name = display_name;
+      });
+    }
+  }
 };
