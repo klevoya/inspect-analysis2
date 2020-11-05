@@ -9,11 +9,11 @@
 		.output ExtendedRootVar
 		.output ExtendedCopyAssign
 		.output ExtendedVarPointsTo
-		.output LoadActionParam
+		.output FirstLoadActionParam
 		.output StoreActionParamAddress
-		.output StoreLoadActionParamAddress
+		.output LoadActionParamAddress
 	#endif
-	.output StoreLoadActionParam
+	.output LoadActionParam
 	.output VarPointsTo
 #endif
 
@@ -54,10 +54,10 @@ IntraCopyAssign(insn, to, from):-
 
 // taint for action parameter
 
-.decl LoadActionParam(insn: Insn, to: Var, from: Var)
+.decl FirstLoadActionParam(insn: Insn, to: Var, from: Var)
 
 // direct load action data from memcpy
-LoadActionParam(insn, to, name):-
+FirstLoadActionParam(insn, to, name):-
 	_Load(insn, from, offset, to),
 	_AssignVar(_, from, base),
 	ActionParam(action, base, offset_symbol, index),
@@ -104,13 +104,13 @@ StoreActionParamAddress(dyn_offset, offset, address_var, param):-
 	stored_offset = to_number(num).
 	
 
-// store + load by calculating offset for stored address
-.decl StoreLoadActionParamAddress(insn: Insn, to: Var, stored_address: Var, param: Var)
+// load by calculating offset for stored address
+.decl LoadActionParamAddress(insn: Insn, to: Var, stored_address: Var, param: Var)
 
 // load_dyn_offset_root = load_dyn_offset + offset_var
 // ..... load_dyn_offset_var <- load_dyn_offset_root
 // load(load_dyn_offset_var + load_offset)
-StoreLoadActionParamAddress(insn, to, stored_address, param):-
+LoadActionParamAddress(insn, to, stored_address, param):-
 	StoreActionParamAddress(store_dyn_offset, store_offset, stored_address, param),
 	_Load(insn, load_dyn_offset_var, load_offset, to),
 	_VarPointsTo(load_dyn_offset_var, load_dyn_offset_root),
@@ -124,31 +124,32 @@ StoreLoadActionParamAddress(insn, to, stored_address, param):-
 
 
 
-.decl StoreLoadActionParam(insn: Insn, to: Var, from: Var)
+.decl LoadActionParam(insn: Insn, to: Var, from: Var)
 
-// store + load action data by directly mataching offset
-StoreLoadActionParam(insn, to, from):-
-	LoadActionParam(insn, to, from).
+// load action data by directly mataching offset
+LoadActionParam(insn, to, from):-
+	FirstLoadActionParam(insn, to, from).
 
-StoreLoadActionParam(insn, to, from):-
+LoadActionParam(insn, to, from):-
 	StoreActionParam(address, offset, from),
 	_Load(insn, address_var, offset, to),
 	_AssignVar(_, address_var, address).
 
 
-// store + load for loading from stored address
-StoreLoadActionParam(insn, to, stored_address):-
-	StoreLoadActionParamAddress(insn, to, stored_address, _).
+// load stored address
+LoadActionParam(insn, to, stored_address):-
+	LoadActionParamAddress(insn, to, stored_address, _).
 
-StoreLoadActionParam(insn, to, param):-
-	StoreLoadActionParamAddress(_, address, _, param),
+// load using loaded addres
+LoadActionParam(insn, to, param):-
+	LoadActionParamAddress(_, address, _, param),
 	_Load(insn, address, 0, to).
 
 
-// load action parameters
+// load action parameters/address
 RootVar(from),
 IntraCopyAssign(insn, to, from):-
-	StoreLoadActionParam(insn, to, from).
+	LoadActionParam(insn, to, from).
 
 
 // intermediate for action param to avoid double negation
@@ -176,7 +177,7 @@ InterCopyAssign(to, from):-
 // load mapping, very crude but enough for checking alias
 InterCopyAssign(to, from):-
 	_Load(insn, from, _, to),
-	!StoreLoadActionParam(insn, _, _).
+	!LoadActionParam(insn, _, _).
 
 
 
@@ -234,38 +235,38 @@ ExtendedVarPointsTo(to, var):-
 // Propagation of parameters in apply including load/store
 .comp ApplyParam{
 	#if DEBUG && VERBOSE
-		.output VarPointsToParam
-		.output StoreParam
-		.output StoreLoadParam
+		.output VarPointsToApplyParam
+		.output StoreApplyParam
+		.output LoadApplyParam
 	#endif
 
-	.decl VarPointsToParam(var: Var)
+	.decl VarPointsToApplyParam(var: Var)
 
-	VarPointsToParam(var):-
+	VarPointsToApplyParam(var):-
 		ExtendedVarPointsTo(var, param),
-		VarPointsToParam(param).
+		VarPointsToApplyParam(param).
 
 	// offset with store param insn
-	.decl StoreParam(insn: Insn, offset: Var)
+	.decl StoreApplyParam(insn: Insn, offset: Var)
 
-	StoreParam(insn, offset):-
+	StoreApplyParam(insn, offset):-
 		_Store(insn, offset, _, var),
-		VarPointsToParam(var).
+		VarPointsToApplyParam(var).
 
 
-	.decl StoreLoadParam(storeInsn: Insn, loadInsn: Insn, loadTo: Var)
+	.decl LoadApplyParam(storeInsn: Insn, loadInsn: Insn, loadTo: Var)
 
 	// Load from store param by matching offsets
-	StoreLoadParam(storeInsn, loadInsn, loadTo):-
-		StoreParam(storeInsn, storeOffset),
+	LoadApplyParam(storeInsn, loadInsn, loadTo):-
+		StoreApplyParam(storeInsn, storeOffset),
 		_Load(loadInsn, loadOffset, _, loadTo),
-		!StoreLoadActionParam(loadInsn, _, _),
+		!LoadActionParam(loadInsn, _, _),
 		ExtendedVarPointsTo(storeOffset, to),
 		ExtendedVarPointsTo(loadOffset, to).
 
 
-	VarPointsToParam(var):-
-		StoreLoadParam(_, _, var).
+	VarPointsToApplyParam(var):-
+		LoadApplyParam(_, _, var).
 
 	// may not be useful
 
@@ -287,28 +288,26 @@ ExtendedVarPointsTo(to, var):-
 // Taint self(reciever)
 .init self = ApplyParam
 
-self.VarPointsToParam(var):-
+self.VarPointsToApplyParam(var):-
 		_FormalArgs(_, "apply", 0, var).
 
-self.VarPointsToParam(var):-
+self.VarPointsToApplyParam(var):-
 	_ActualReturn(_, "current_receiver", var).
 
 
 // Taint code
 .init code = ApplyParam
 
-code.VarPointsToParam(var):-
+code.VarPointsToApplyParam(var):-
 		_FormalArgs(_, "apply", 1, var).
 
 
 
-
 VarPointsTo(var, "_self"):-
-	self.VarPointsToParam(var).
+	self.VarPointsToApplyParam(var).
 
 VarPointsTo(var, "_code"):-
-	code.VarPointsToParam(var).
-
+	code.VarPointsToApplyParam(var).
 
 
 }

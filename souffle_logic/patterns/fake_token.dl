@@ -25,7 +25,7 @@ PossibleFakeToken(action):-
 CheckFakeToken(insn):-
 	_AssignType(insn, to, "Ne"),
 	_AssignVar(insn, to, from),
-	pointer.code.VarPointsToParam(from).
+	pointer.code.VarPointsToApplyParam(from).
 
 
 
