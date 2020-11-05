@@ -111,7 +111,7 @@ StoreActionParamAddress(dyn_offset, offset, address_var, param):-
 // ..... load_dyn_offset_var <- load_dyn_offset_root
 // load(load_dyn_offset_var + load_offset)
 StoreLoadActionParamAddress(insn, to, stored_address, param):-
-	StoreActionParamAddress(store_dyn_offset, stor_offset, stored_address, param),
+	StoreActionParamAddress(store_dyn_offset, store_offset, stored_address, param),
 	_Load(insn, load_dyn_offset_var, load_offset, to),
 	_VarPointsTo(load_dyn_offset_var, load_dyn_offset_root),
 	_AssignType(_,load_dyn_offset_root, "Add"),
@@ -120,7 +120,7 @@ StoreLoadActionParamAddress(insn, to, stored_address, param):-
 	_VarPointsTo(store_dyn_offset, var),
 	_AssignVar(_, load_dyn_offset_root, offset_var),
 	_SimpleAssign(_, offset_var, offset),
-	stor_offset = to_number(offset) + load_offset.
+	store_offset = to_number(offset) + load_offset.
 
 
 

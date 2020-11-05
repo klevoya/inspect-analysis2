@@ -7,6 +7,7 @@ e.g.	Actions, DBInsn etc
 		.output CheckTransfer
 		.output CheckEOSIO
 		.output DBRemove
+		.output DBUpdateSamePayer
 		.output _DBInsn
 		.output ActionData
 	#endif
@@ -164,6 +165,13 @@ DBRemove(removeInsn, payer):-
 	ActionFuncReachable(action, "db_find_i64", findInsn),
 	_ActualArgs(findInsn, _, 3, payer).
 
+
+.decl DBUpdateSamePayer(insn: Insn)
+
+DBUpdateSamePayer(insn):-
+	_DBUpdate(insn, _, payer, _),
+	pointer.VarPointsTo(payer, var),
+	_SimpleAssign(_, var, "0.0").
 
 .decl _DBInsn(insn: Insn, payer: Var)
 

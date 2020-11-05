@@ -1,4 +1,8 @@
 #if DEBUG
+	#if VERBOSE
+		.output PossibleOverflowVar
+	#endif
+
 	.output PossibleOverflow
 	.output OverflowCheck
 	.output UnderflowCheck
@@ -8,12 +12,18 @@
 
 .decl PossibleOverflow(insn: Insn, var: Var)
 
-PossibleOverflow(insn, result):-
-	(_AssignType(insn, result, "Sub");
-	_AssignType(insn, result, "Add")),
-	_AssignVar(insn, result, var),
+.decl PossibleOverflowVar(var: Var)
+
+PossibleOverflowVar(var):-
 	AllActionParam(_, _, param),
 	pointer.VarPointsTo(var, param).
+
+
+PossibleOverflow(insn, result):-
+	PossibleOverflowVar(var),
+	_AssignVar(insn, result, var),
+	(_AssignType(insn, result, "Sub");
+	_AssignType(insn, result, "Add")).
 
 
 .decl OverflowCheck(var:Var)
