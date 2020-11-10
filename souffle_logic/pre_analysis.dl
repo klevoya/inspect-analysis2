@@ -41,6 +41,11 @@ ActionData(action, var):-
 	Action(_, action),
 	_MemCopy(insn, var, _, _),
 	_FuncInsn(action, insn).
+
+ActionData(action, from):-
+	ActionData(action, to),
+	_AssignVar(_, to, from),
+	_AssignType(_, to, "Copy").
 	
 
 .comp Order<Sort, Node>{
@@ -203,8 +208,7 @@ DBInsn(insn, "_self"):-
 // if dbOp on code
 DBInsn(insn, "_code"):-
 	_DBInsn(insn, payer),
-	pointer.VarPointsTo(payer,"_code"),
-	!pointer.VarPointsTo(payer,"_self").
+	pointer.VarPointsTo(payer,"_code").
 
 // else
 DBInsn(insn, payer):-
