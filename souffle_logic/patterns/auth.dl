@@ -26,7 +26,7 @@ Three layers:
 
 /* Auth Check */
 
-.decl AuthViolation(insn: Insn)
+.decl AuthViolation(action: Function, insn: Insn)
 
 /* Violation: 
 1. DB Insn
@@ -100,11 +100,12 @@ AuthVarForDB(check, var, dbInsn):-
 
 // If miss some payer auths 
 
-AuthViolation(dbInsn):-
+AuthViolation(action, dbInsn):-
 	PossibleAuthViolation(dbInsn),
 	!AuthVarForDB(_, to, dbInsn),
 	DBInsn(dbInsn, payer),
-	pointer.VarPointsTo(payer, to).
+	pointer.VarPointsTo(payer, to),
+	ActionFuncReachable(action, _, dbInsn).
 
 
 /* Flow Sensitive rules*/
@@ -147,10 +148,11 @@ PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	pointer.VarPointsTo(actualVar, to).
 
 // For mixed order
-AuthViolation(dbInsn):-
+AuthViolation(action, dbInsn):-
 	PayerInFuncCallPointsTo(dbInsn, to, funcCall),
 	!auth_dom_db.SrcDomFunc(check, _, funcCall),
 	_ActualArgs(check, "require_auth", 0, authVar),
-	pointer.VarPointsTo(authVar, to).
+	pointer.VarPointsTo(authVar, to),
+	ActionFuncReachable(action, _, dbInsn).
 
 

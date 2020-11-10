@@ -46,9 +46,11 @@ UnderflowCheck(result):-
 	_SimpleAssign(_, other, "4.6116860184273879E18").
 
 
-.decl OverflowViolation(insn: Insn)
+.decl OverflowViolation(action: Function, insn: Insn)
 
-OverflowViolation(insn):-
+OverflowViolation(action, insn):-
 	PossibleOverflow(insn, result),
 	(!OverflowCheck(result);
-	!UnderflowCheck(result)).
+	!UnderflowCheck(result)),
+	_FuncInsn(function,insn),
+	ActionFuncReachable(action, function, _).

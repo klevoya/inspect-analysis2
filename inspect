@@ -1,30 +1,71 @@
-#!/bin/bash
-mkdir -p database/
-mkdir -p artefacts/
+#!/usr/bin/env python3
+import sys,os,glob
+import subprocess
+import time
+import csv
+import action_name_parser 
+import shutil
 
-rm -rf database/*
-rm -rf artefacts/*
+database_dir = "database"
+artefacts_dir = "artefacts"
 
-java -jar binaries/inspect.jar --keep-artefacts -w artefacts/ -d -i $1
-souffle souffle_logic/main.dl -F artefacts/* -D database/
+# create if not exists
+if not os.path.exists(database_dir):
+    os.makedirs(database_dir)
 
-echo -e "\nRequire Auth Violation: "
-cat database/AuthViolation.csv
+if not os.path.exists(artefacts_dir):
+    os.makedirs(artefacts_dir)
 
-# echo -e "\nDB Insn: "
-# cat database/DBInsn.csv
+# clean up 
+subprocess.call("rm -rf " + database_dir + '/*', shell=True)
+subprocess.call("rm -rf " + artefacts_dir + '/*', shell=True)
 
-echo -e "\nRollback Violation: "
-cat database/RollbackViolation.csv
+# call inspect decompiler & souffle logic
+subprocess.call("java -jar binaries/inspect.jar --keep-artefacts -w " + artefacts_dir + " -d -i " + sys.argv[1], shell=True)
+subprocess.call("souffle souffle_logic/main.dl -F " + artefacts_dir + "/* -D "+ database_dir, shell=True)
 
-echo -e "\nFake Token Violation: "
-cat database/FakeTokenViolation.csv
+# call action name parser for each action
+action_name = {}
+with open(database_dir + "/ActionCondition.csv") as file:
+	reader = csv.reader(file, delimiter='	')
+	for row in reader:
+		action_name[row[0]] = action_name_parser.string_from_long(row[1])
 
-echo -e "\nFake Notification Violation: "
-cat database/FakeNotifyViolation.csv
 
-echo -e "\nSeperation Violation: "
-cat database/SeperationViolation.csv
+# print result
+END = "\033[0m"
 
-echo -e "\nNumeric Overflow Violation: "
-cat database/OverflowViolation.csv
+def warn(line):
+	return "\033[1;31m" + line + END
+
+def nuetral(line):
+	return "\033[90m" + line + END
+
+def good(line):
+	return "\033[1;32m" + line + END
+
+def bold(line):
+	return "\033[1m" + line + END
+
+def print_result(violation_file):
+	
+	with open(os.path.join(database_dir, violation_file)) as file:
+		
+		reader = csv.reader(file, delimiter='	')
+		basename = os.path.basename(violation_file).split(".")[0] + ": "
+		reader = [i for i in reader]
+		print(warn(basename + u'\u2718') if len(reader) else good(basename + u'\u2713')) 
+
+		for row in reader:
+			print(nuetral("Action: ") + action_name[row[0]], end="	")
+			rest = nuetral("Insn: ") + row[1] if len(row) > 1 else ""
+			print(rest)
+	print()
+
+print(bold("Analysis Result\n"))
+print_result("AuthViolation.csv")
+print_result("RollbackViolation.csv")
+print_result("FakeTokenViolation.csv")
+print_result("FakeNotifyViolation.csv")
+print_result("SeperationViolation.csv")
+print_result("OverflowViolation.csv")

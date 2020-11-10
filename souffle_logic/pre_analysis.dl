@@ -12,6 +12,7 @@ e.g.	Actions, DBInsn etc
 		.output ActionData
 	#endif
 	.output Action
+	.output ActionCondition
 	.output ActionParam
 	.output AllActionParam
 	.output ActionFuncReachable
@@ -125,8 +126,8 @@ CheckTransfer(insn, toBranch):-
 .decl CheckEOSIO(insn: Insn, toBranch: Insn)
 
 CheckEOSIO(insn, toBranch):-
-	_SimpleAssign(_, transferVar, "6.1386635915927654E18"),
-	_AssignVar(_, ifVar, transferVar),
+	_SimpleAssign(_, eosVar, "6.1386635915927654E18"),
+	_AssignVar(_, ifVar, eosVar),
 	_Branch(insn, _, toBranch, ifVar).
 
 
@@ -144,6 +145,14 @@ OnTransferEOSAction(call, action):-
 	CheckEOSIO(_, checkedHead),
 	DominateBB(checkedHead, callHead).
 
+.decl ActionCondition(action: Function, constant: symbol)
+
+ActionCondition(action, constant):-
+	Action(call, action),
+	BasicBlockHead(toBranch, call),
+	_SimpleAssign(_, constVar, constant),
+	_AssignVar(_, ifVar, constVar),
+	_Branch(_, _, toBranch, ifVar).
 
 .decl DBAction(action: Function)
 

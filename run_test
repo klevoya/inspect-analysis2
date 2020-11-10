@@ -2,7 +2,6 @@
 import sys,os,glob
 import subprocess
 import time
-import csv
 import argparse
 
 

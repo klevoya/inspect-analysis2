@@ -23,10 +23,10 @@
 .output Result
 
 Result("Auth", num):-
-	num = count : AuthViolation(_).
+	num = count : AuthViolation(_, _).
 
 Result("Rollback", num):-
-	num = count : RollbackViolation(_).
+	num = count : RollbackViolation(_, _).
 
 Result("FakeToken", num):-
 	num = count : FakeTokenViolation(_).
@@ -38,4 +38,4 @@ Result("Seperation", num):-
 	num = count : SeperationViolation(_).
 
 Result("Overflow", num):-
-	num = count : OverflowViolation(_).
+	num = count : OverflowViolation(_, _).
