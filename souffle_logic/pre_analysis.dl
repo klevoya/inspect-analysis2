@@ -10,6 +10,8 @@ e.g.	Actions, DBInsn etc
 		.output DBUpdateSamePayer
 		.output _DBInsn
 		.output ActionData
+		.output _DBDataAddress
+		.output DBDataAddress
 	#endif
 	.output Action
 	.output ActionCondition
@@ -20,6 +22,7 @@ e.g.	Actions, DBInsn etc
 	.output OnTransferEOSAction
 	.output DBAction
 	.output DBInsn
+	.output DBData
 #endif
 
 /* Action Related */
@@ -36,7 +39,7 @@ Action(insn, action):-
 
 ActionData(action, var):-
 	Action(_, action),
-	_MemCopy(insn, var, _),
+	_MemCopy(insn, var, _, _),
 	_FuncInsn(action, insn).
 	
 
@@ -208,5 +211,63 @@ DBInsn(insn, payer):-
 	_DBInsn(insn, payer),
 	!pointer.VarPointsTo(payer,"_code"),
 	!pointer.VarPointsTo(payer,"_self").
+
+
+// Example
+/*
+store(dyn_offset = $um + memarg.offset: 8) = $up
+
+....
+
+$uq = $tv (get_local[4])
+$ur = 16.0
+$us = $uq + $ur
+$ut = $ue (get_local[5])
+$uu = 8.0
+($uv) = memcpy($us, $ut, $uu)
+
+....
+
+$vo = $tv (get_local[4])
+$vp = 16.0
+$vq = $vo + $vp
+($vs) = db_store_i64($vi, $vj, $vk, $vm, $vq, $vr)
+
+*/
+
+// The one used for dbOps
+.decl _DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
+
+_DBDataAddress(insn, dynOffset, offset):-
+	(_DBUpdate(insn, _, _, address);
+	_DBStore(insn, _, _, _, address)),
+	_AssignVar(_, address, dynOffset),
+	_AssignVar(_, address, memarg),
+	_SimpleAssign(_, memarg, offset),
+	dynOffset != memarg.
+
+
+// The one that used for memcpy
+.decl DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
+
+DBDataAddress(insn, from, len):-
+	_DBDataAddress(insn, dynOffset1, offset),
+	_MemCopy(_, to, from, lenVar),
+	_SimpleAssign(_, lenVar, len),
+	_AssignVar(_, to, dynOffset2),
+	_AssignVar(_, to, memarg),
+	_SimpleAssign(_, memarg, offset),
+	_AssignVar(_, dynOffset1, base),
+	_AssignVar(_, dynOffset2, base).
+
+// The actual data
+.decl DBData(insn: Insn, var: Var)
+
+DBData(insn, var):-
+	DBDataAddress(insn, dynOffset, offset),
+	_Store(_, storeDynOffset, storeOffset, var),
+	_AssignVar(_, dynOffset, base),
+	_AssignVar(_, storeDynOffset, base),
+	to_number(offset) = storeOffset.
 
 

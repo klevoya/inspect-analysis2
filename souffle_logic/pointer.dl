@@ -4,12 +4,15 @@
 #if DEBUG
 	#if VERBOSE
 		.output RootVar
+		.output _VarPointsTo
+		.output _InterCopyAssign
 		.output IntraCopyAssign
 		.output InterCopyAssign
 		.output ExtendedRootVar
 		.output ExtendedCopyAssign
 		.output ExtendedVarPointsTo
 		.output FirstLoadActionParam
+		.output StoreActionParam
 		.output StoreActionParamAddress
 		.output LoadActionParamAddress
 	#endif
@@ -81,40 +84,40 @@ _VarPointsTo(to, var):-
 
 StoreActionParam(address, offset, to):-
 	_VarPointsTo(var, to),
-	LoadActionParam(_, _, to),
+	FirstLoadActionParam(_, _, to),
 	_Store(_, address_var, offset, var), 
 	_AssignVar(_, address_var, address).
 
 // store the address that can point to action data
-.decl StoreActionParamAddress (dyn_offset: Var, offset: number, address_var: Var, param: Var)
+.decl StoreActionParamAddress (insn: Insn, dyn_offset: Var, offset: number, address_var: Var, index: number, param: Var)
 
-StoreActionParamAddress(dyn_offset, offset, address_var, param):-
+StoreActionParamAddress(insn, dyn_offset, offset, address_var, n + 1, param):-
 	// the store statement for dynOffset
-	_Store(_, dyn_offset, offset, address_var), 
-	// the store statement for action param
-	StoreActionParam(stored_dyn_offset_1, stored_offset, param),
-	_AssignType(_,address_var, "Add"),
+	_Store(insn, dyn_offset, offset, address_var), 
+	// the store statement for action param / address
+	(StoreActionParam(stored_dyn_offset_1, stored_offset, param), n = 0;
+	StoreActionParamAddress(stored_insn, stored_dyn_offset_1, stored_offset, _, n, param)),
+	_VarPointsTo(address_var, base),
 	// address points to the same place
-	_AssignVar(_,address_var, stored_dyn_offset_2),
+	_AssignVar(_, base, stored_dyn_offset_2),
 	_VarPointsTo(stored_dyn_offset_1, var),
 	_VarPointsTo(stored_dyn_offset_2, var),
 	// the stored offset is same
-	_AssignVar(_,address_var, offset_var),
+	_AssignVar(_,base, offset_var),
 	_SimpleAssign(_, offset_var, num),
 	stored_offset = to_number(num).
 	
 
 // load by calculating offset for stored address
-.decl LoadActionParamAddress(insn: Insn, to: Var, stored_address: Var, param: Var)
+.decl LoadActionParamAddress(insn: Insn, to: Var, stored_address: Var, index: number, param: Var)
 
 // load_dyn_offset_root = load_dyn_offset + offset_var
 // ..... load_dyn_offset_var <- load_dyn_offset_root
 // load(load_dyn_offset_var + load_offset)
-LoadActionParamAddress(insn, to, stored_address, param):-
-	StoreActionParamAddress(store_dyn_offset, store_offset, stored_address, param),
+LoadActionParamAddress(insn, to, stored_address, n-1, param):-
+	StoreActionParamAddress(_, store_dyn_offset, store_offset, stored_address, n, param),
 	_Load(insn, load_dyn_offset_var, load_offset, to),
 	_VarPointsTo(load_dyn_offset_var, load_dyn_offset_root),
-	_AssignType(_,load_dyn_offset_root, "Add"),
 	_AssignVar(_, load_dyn_offset_root, load_dyn_offset),
 	_VarPointsTo(load_dyn_offset, var),
 	_VarPointsTo(store_dyn_offset, var),
@@ -135,21 +138,17 @@ LoadActionParam(insn, to, from):-
 	_Load(insn, address_var, offset, to),
 	_AssignVar(_, address_var, address).
 
-
-// load stored address
-LoadActionParam(insn, to, stored_address):-
-	LoadActionParamAddress(insn, to, stored_address, _).
-
-// load using loaded addres
+// load using loaded address
 LoadActionParam(insn, to, param):-
-	LoadActionParamAddress(_, address, _, param),
+	LoadActionParamAddress(_, address, _, 0, param),
 	_Load(insn, address, 0, to).
 
 
 // load action parameters/address
 RootVar(from),
 IntraCopyAssign(insn, to, from):-
-	LoadActionParam(insn, to, from).
+	LoadActionParam(insn, to, from);
+	LoadActionParamAddress(insn, to, from, _, _).
 
 
 // intermediate for action param to avoid double negation
@@ -177,7 +176,8 @@ InterCopyAssign(to, from):-
 // load mapping, very crude but enough for checking alias
 InterCopyAssign(to, from):-
 	_Load(insn, from, _, to),
-	!LoadActionParam(insn, _, _).
+	!LoadActionParam(insn, _, _),
+	!LoadActionParamAddress(insn, _, _, _, _).
 
 
 
@@ -261,6 +261,7 @@ ExtendedVarPointsTo(to, var):-
 		StoreApplyParam(storeInsn, storeOffset),
 		_Load(loadInsn, loadOffset, _, loadTo),
 		!LoadActionParam(loadInsn, _, _),
+		!LoadActionParamAddress(loadInsn, _, _, _, _),
 		ExtendedVarPointsTo(storeOffset, to),
 		ExtendedVarPointsTo(loadOffset, to).
 

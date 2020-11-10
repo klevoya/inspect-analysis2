@@ -48,7 +48,7 @@ def check_diff(expected, actual):
 def run_n_check(file):
 	print("Test case:", nuetral(file))
 	with open(os.devnull, "w") as f:
-		subprocess.call("./inspect " + file, shell=True, stdout=f)
+		subprocess.call("./inspect " + file, shell=True, stdout= None if args.verbose else f)
 
 	expected = os.path.splitext(file)[0] + ".out"
 	actual = os.getcwd() + "/database/Result.csv"
@@ -86,6 +86,7 @@ def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('dir')
 	parser.add_argument("-c", "--create", help="Creating all expected file from the actual output", action='store_true')
+	parser.add_argument("-v", "--verbose", help="Print out the analysis result for each test case", action='store_true')
 	args = parser.parse_args()
 
 	benchmark_dir = args.dir

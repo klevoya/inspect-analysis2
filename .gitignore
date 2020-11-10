@@ -9,3 +9,4 @@ database/
 benchmark/BancorX
 profile
 **.abi
+**__pycache__/
