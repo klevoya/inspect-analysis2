@@ -14,7 +14,6 @@ e.g.	Actions, DBInsn etc
 		.output DBDataAddress
 	#endif
 	.output Action
-	.output ActionCondition
 	.output ActionParam
 	.output AllActionParam
 	.output ActionFuncReachable
@@ -25,6 +24,8 @@ e.g.	Actions, DBInsn etc
 	.output DBInsn
 	.output DBData
 #endif
+
+.output ActionCondition
 
 /* Action Related */
 .decl Action(call: Insn, action: Function)

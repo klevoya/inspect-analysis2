@@ -71,7 +71,7 @@ def run_folder(folder):
 		run_time_m = str(int(run_time // 60)) + "m "if run_time // 60 > 0 else ""
 		run_time_s = str(int(run_time % 60)) + "s"
 		# not needed atm, cuz most test cases are under 1 sec
-		# print(bold("Run Time: ") + run_time_m + run_time_s + END)
+		print(bold("Run Time: ") + run_time_m + run_time_s + END)
 		print()
 
 	print(bold("Test cases passed:"), passed, "/", len(tests))

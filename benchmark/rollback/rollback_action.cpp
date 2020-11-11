@@ -6,8 +6,8 @@ using namespace std;
 
 static constexpr extended_symbol EOS_SYMBOL =
     extended_symbol(symbol("EOS", 4), name("eosio.token"));
-
-CONTRACT rollback : public contract {
+// Only one send_inline() is compiled
+CONTRACT rollback_action : public contract {
 public:
   using contract::contract;
 
@@ -17,7 +17,7 @@ public:
   }
 
   using transfer_action =
-      eosio::action_wrapper<"transfer"_n, &rollback::transfer>;
+      eosio::action_wrapper<"transfer"_n, &rollback_action::transfer>;
 
   ACTION batchpayout(std::vector<name> tos, asset quantity) {
     require_auth(get_self());
@@ -33,7 +33,7 @@ public:
   ACTION log(std::vector<name> tos, asset quantity) {
     require_auth(get_self());
   }
-  using log_action = eosio::action_wrapper<"log"_n, &rollback::log>;
+  using log_action = eosio::action_wrapper<"log"_n, &rollback_action::log>;
 
   ACTION trade(std::vector<name> tos, asset quantity) {
     require_auth(get_self());

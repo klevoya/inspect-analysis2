@@ -1,5 +1,5 @@
-#define DEBUG 1
-#define VERBOSE 1
+#define DEBUG 0
+#define VERBOSE 0
 #define MayAnalysis 0 // May analysis will report less violation; May ⊆ Must
 
 #include "control.dl"

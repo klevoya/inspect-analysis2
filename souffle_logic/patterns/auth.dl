@@ -15,6 +15,7 @@ Three layers:
 #if DEBUG
 	#if VERBOSE
 		.output SafeDBOps
+		.output SafeDBOpsInAction
 		.output PossibleAuthViolation
 		.output PayerInFunc
 		.output PayerInFuncCallPointsTo
@@ -98,15 +99,25 @@ AuthVarForDB(check, var, dbInsn):-
 	Expect violation at 4
 */
 
-// If miss some payer auths 
 
+.decl SafeDBOpsInAction(action: Function, dbInsn: Insn)
+
+SafeDBOpsInAction(action, dbInsn):-
+	PossibleAuthViolation(dbInsn),
+	AuthVarForDB(authInsn, to, dbInsn),
+	DBInsn(dbInsn, payer),
+	pointer.VarPointsTo(payer, to),
+	ActionFuncReachable(action, _, authInsn),
+	ActionFuncReachable(action, _, dbInsn).
+
+// If miss some payer auths 
 AuthViolation(action, dbInsn):-
 	PossibleAuthViolation(dbInsn),
 	!AuthVarForDB(_, to, dbInsn),
+	!SafeDBOpsInAction(action, dbInsn),
 	DBInsn(dbInsn, payer),
 	pointer.VarPointsTo(payer, to),
 	ActionFuncReachable(action, _, dbInsn).
-
 
 /* Flow Sensitive rules*/
 
