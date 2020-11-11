@@ -28,6 +28,40 @@ public:
     });
   }
 
+  ACTION emplaceself(name username, const std::string &display_name) {
+    require_auth(_self);
+    _users.emplace(username, [&](auto &new_user) {
+      new_user.username = username;
+      new_user.display_name = display_name;
+    });
+  }
+
+  ACTION emplaceself2(name username, const std::string &display_name) {
+    check(get_self() == name("test"), "wrong account");
+
+    auto user_itr = _users.find(username.value);
+    if (user_itr != _users.end()) {
+      _users.emplace(username, [&](auto &new_user) {
+        new_user.username = username;
+        new_user.display_name = display_name;
+      });
+    }
+  }
+
+  ACTION emplaceself3(name username, const std::string &display_name) {
+    check(get_self() == name("test"), "wrong account");
+
+    emplace_helper(username, display_name);
+  }
+
+  ACTION emplaceconst(name username, const std::string &display_name) {
+    require_auth(name("peter"));
+    _users.emplace(username, [&](auto &new_user) {
+      new_user.username = username;
+      new_user.display_name = display_name;
+    });
+  }
+
   ACTION emplaceuser(name username, const std::string &display_name) {
     // safe
     require_auth(username);
@@ -37,19 +71,26 @@ public:
     });
   }
 
-  ACTION emplaceself(name username, const std::string &display_name) {
-    require_auth(_self);
-    _users.emplace(username, [&](auto &new_user) {
-      new_user.username = username;
-      new_user.display_name = display_name;
-    });
+  ACTION emplaceuser2(name username, const std::string &display_name) {
+    // safe
+    check(get_self() == name("test"), "wrong account");
+    require_auth(username);
+    auto user_itr = _users.find(username.value);
+    if (user_itr != _users.end()) {
+      _users.emplace(username, [&](auto &new_user) {
+        new_user.username = username;
+        new_user.display_name = display_name;
+      });
+    }
   }
 
-  ACTION emplaceconst(name username, const std::string &display_name) {
-    require_auth(name("peter"));
-    _users.emplace(username, [&](auto &new_user) {
-      new_user.username = username;
-      new_user.display_name = display_name;
-    });
+  __attribute__((noinline)) void emplace_helper(name username, std::string display_name) {
+    auto user_itr = _users.find(username.value);
+    if (user_itr != _users.end()) {
+      _users.emplace(username, [&](auto &new_user) {
+        new_user.username = username;
+        new_user.display_name = display_name;
+      });
+    }
   }
 };
