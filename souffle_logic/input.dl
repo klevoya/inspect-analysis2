@@ -66,6 +66,6 @@ GET_REL_FROM_FILE(_FormalReturn, "must/fnDefinitionRtn.facts")
 .decl _ActualReturn(callSite: Insn, func: Function, return: Var)
 GET_REL_FROM_FILE(_ActualReturn, "must/fnCallRtn.facts")
 
-.decl _MemCopy(insn: Insn, to:Var, from:Var)
+.decl _MemCopy(insn: Insn, to:Var, from:Var, len: Var)
 GET_REL_FROM_FILE(_MemCopy, "must/memcpy.facts")
 

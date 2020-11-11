@@ -1,5 +1,5 @@
-#define DEBUG 1
-#define VERBOSE 1
+#define DEBUG 0
+#define VERBOSE 0
 #define MayAnalysis 0 // May analysis will report less violation; May ⊆ Must
 
 #include "control.dl"
@@ -13,7 +13,9 @@
 #include "patterns/auth.dl"
 #include "patterns/rollback.dl"
 #include "patterns/fake_token.dl"
+#include "patterns/fake_notify.dl"
 #include "patterns/seperation.dl"
+#include "patterns/overflow.dl"
 
 
 // Final Results for test suite
@@ -21,13 +23,19 @@
 .output Result
 
 Result("Auth", num):-
-	num = count : AuthViolation(_).
+	num = count : AuthViolation(_, _).
 
 Result("Rollback", num):-
-	num = count : RollbackViolation(_).
+	num = count : RollbackViolation(_, _).
 
 Result("FakeToken", num):-
 	num = count : FakeTokenViolation(_).
 
+Result("FakeNotify", num):-
+	num = count : FakeNotifyViolation(_).
+
 Result("Seperation", num):-
 	num = count : SeperationViolation(_).
+
+Result("Overflow", num):-
+	num = count : OverflowViolation(_, _).

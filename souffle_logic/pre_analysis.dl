@@ -7,17 +7,25 @@ e.g.	Actions, DBInsn etc
 		.output CheckTransfer
 		.output CheckEOSIO
 		.output DBRemove
+		.output DBUpdateSamePayer
 		.output _DBInsn
 		.output ActionData
+		.output _DBDataAddress
+		.output DBDataAddress
 	#endif
 	.output Action
 	.output ActionParam
+	.output AllActionParam
 	.output ActionFuncReachable
+	.output CheckNotify
 	.output OnTransferAction
 	.output OnTransferEOSAction
 	.output DBAction
 	.output DBInsn
+	.output DBData
 #endif
+
+.output ActionCondition
 
 /* Action Related */
 .decl Action(call: Insn, action: Function)
@@ -29,12 +37,32 @@ Action(insn, action):-
 
 
 /* Action Parameters */
+/* Example:
+$il = $eu (get_local[3])
+$im = 40.0
+$in = $il + $im
+$io = $if (get_local[2])
+$ip = 8.0
+($iq) = memcpy($in, $io, $ip)
+
+...
+$iw = $eu (get_local[3])
+$ix = load(dyn_offset: $iw + memarg.offset: 40)
+
+$ix -> parameter
+*/
+
 .decl ActionData(action: Function, var: Var)
 
 ActionData(action, var):-
 	Action(_, action),
-	_MemCopy(insn, var, _),
+	_MemCopy(insn, var, _, _),
 	_FuncInsn(action, insn).
+
+ActionData(action, from):-
+	ActionData(action, to),
+	_AssignVar(_, to, from),
+	_AssignType(_, to, "Copy").
 	
 
 .comp Order<Sort, Node>{
@@ -75,7 +103,6 @@ _ActionParam(action, base, num):-
 	_AssignType(_, var, "Copy"),
 	_AssignVar(_, var, base),
 	_AssignVar(_, data, offset),
-	_AssignType(_, offset, "Const"),
 	_SimpleAssign(_, offset, num).
 
 // re-order the parameter to get the index
@@ -85,6 +112,7 @@ order.Nodes(action, num):-
 	_ActionParam(action, _, num).
 
 .decl ActionParam(action: Function, base: Var, offset: symbol, index: number)
+
 ActionParam(action, base, offset, 0):-
 	_ActionParam(action, base, offset),
 	order.Last(action, offset).
@@ -93,7 +121,11 @@ ActionParam(action, base, offset, n+1):-
 	ActionParam(action, base, next, n),
 	order.Next(action, offset, next).
 
+// easy to access action parameter name
+.decl AllActionParam(action: Function, index: number, name: Var)
 
+AllActionParam(action, index, cat(cat(action, "_"), to_string(index))):-
+	ActionParam(action, _, _, index).
 
 /* Action Reachable */
 .decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
@@ -109,18 +141,37 @@ ActionFuncReachable(action, to, insn):-
 
 /* Type of Action */
 
+.decl CheckNotify(insn: Insn, toBranch: Insn)
+
+CheckNotify(insn, toBranch):-
+	_FuncInsn("apply", insn),
+	// the false branch of _self == _code
+	_Branch(insn, toBranch, _, ifVar),
+	_AssignType(_, ifVar, "Eq"),
+	_AssignVar(_, ifVar, x),
+	pointer.VarPointsTo(x, "_self"),
+	_AssignVar(_, ifVar, y),
+	x != y,
+	pointer.VarPointsTo(y, "_code").
+
 .decl CheckTransfer(insn: Insn, toBranch: Insn)
 
 CheckTransfer(insn, toBranch):-
 	_SimpleAssign(_, transferVar, "-3.6171687602778276E18"),
 	_AssignVar(_, ifVar, transferVar),
-	_Branch(insn, _, toBranch, ifVar).
+	_Branch(insn, _, toBranch, ifVar),
+	// check is after checking _self != _code 
+	// eliminate action named 'transfer'
+	CheckNotify(_, notifyHead),
+	DominateBB(notifyHead, transferHead),
+	BasicBlockHead(transferHead, insn).
+
 
 .decl CheckEOSIO(insn: Insn, toBranch: Insn)
 
 CheckEOSIO(insn, toBranch):-
-	_SimpleAssign(_, transferVar, "6.1386635915927654E18"),
-	_AssignVar(_, ifVar, transferVar),
+	_SimpleAssign(_, eosVar, "6.1386635915927654E18"),
+	_AssignVar(_, ifVar, eosVar),
 	_Branch(insn, _, toBranch, ifVar).
 
 
@@ -138,6 +189,14 @@ OnTransferEOSAction(call, action):-
 	CheckEOSIO(_, checkedHead),
 	DominateBB(checkedHead, callHead).
 
+.decl ActionCondition(action: Function, constant: symbol)
+
+ActionCondition(action, constant):-
+	Action(call, action),
+	BasicBlockHead(toBranch, call),
+	_SimpleAssign(_, constVar, constant),
+	_AssignVar(_, ifVar, constVar),
+	_Branch(_, _, toBranch, ifVar).
 
 .decl DBAction(action: Function)
 
@@ -160,6 +219,13 @@ DBRemove(removeInsn, payer):-
 	_ActualArgs(findInsn, _, 3, payer).
 
 
+.decl DBUpdateSamePayer(insn: Insn)
+
+DBUpdateSamePayer(insn):-
+	_DBUpdate(insn, _, payer, _),
+	pointer.VarPointsTo(payer, var),
+	_SimpleAssign(_, var, "0.0").
+
 .decl _DBInsn(insn: Insn, payer: Var)
 
 _DBInsn(insn, payer):-
@@ -178,13 +244,70 @@ DBInsn(insn, "_self"):-
 // if dbOp on code
 DBInsn(insn, "_code"):-
 	_DBInsn(insn, payer),
-	pointer.VarPointsTo(payer,"_code"),
-	!pointer.VarPointsTo(payer,"_self").
+	pointer.VarPointsTo(payer,"_code").
 
 // else
 DBInsn(insn, payer):-
 	_DBInsn(insn, payer),
 	!pointer.VarPointsTo(payer,"_code"),
 	!pointer.VarPointsTo(payer,"_self").
+
+
+// Example
+/*
+store(dyn_offset = $um + memarg.offset: 8) = $up
+
+....
+
+$uq = $tv (get_local[4])
+$ur = 16.0
+$us = $uq + $ur
+$ut = $ue (get_local[5])
+$uu = 8.0
+($uv) = memcpy($us, $ut, $uu)
+
+....
+
+$vo = $tv (get_local[4])
+$vp = 16.0
+$vq = $vo + $vp
+($vs) = db_store_i64($vi, $vj, $vk, $vm, $vq, $vr)
+
+*/
+
+// The one used for dbOps
+.decl _DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
+
+_DBDataAddress(insn, dynOffset, offset):-
+	(_DBUpdate(insn, _, _, address);
+	_DBStore(insn, _, _, _, address)),
+	_AssignVar(_, address, dynOffset),
+	_AssignVar(_, address, memarg),
+	_SimpleAssign(_, memarg, offset),
+	dynOffset != memarg.
+
+
+// The one that used for memcpy
+.decl DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
+
+DBDataAddress(insn, from, len):-
+	_DBDataAddress(insn, dynOffset1, offset),
+	_MemCopy(_, to, from, lenVar),
+	_SimpleAssign(_, lenVar, len),
+	_AssignVar(_, to, dynOffset2),
+	_AssignVar(_, to, memarg),
+	_SimpleAssign(_, memarg, offset),
+	_AssignVar(_, dynOffset1, base),
+	_AssignVar(_, dynOffset2, base).
+
+// The actual data
+.decl DBData(insn: Insn, var: Var)
+
+DBData(insn, var):-
+	DBDataAddress(insn, dynOffset, offset),
+	_Store(_, storeDynOffset, storeOffset, var),
+	pointer.VarPointsTo(dynOffset, base),
+	pointer.VarPointsTo(storeDynOffset, base),
+	to_number(offset) >= storeOffset.
 
 

@@ -39,8 +39,10 @@ InlineContract(sendInsn, name):-
 	pointer.VarPointsTo(offset, obj).
 	
 
-.decl RollbackViolation(insn: Insn)
+.decl RollbackViolation(action: Function, insn: Insn)
 
-RollbackViolation(insn):-
+RollbackViolation(action, insn):-
 	InlineContract(insn, name),
-	_SimpleAssign(_, name, _).
+	_SimpleAssign(_, name, _),
+	_FuncInsn(function,insn),
+	ActionFuncReachable(action, function, _).

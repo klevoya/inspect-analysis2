@@ -7,8 +7,7 @@ using namespace eosio;
 CONTRACT no_auth : public contract {
   public:
       using contract::contract;
-      [[eosio::action]]
-      void transfer(name user, uint64_t quantity) {
+      ACTION transfer(name user, uint64_t quantity) {
         people_index people(get_first_receiver(), get_first_receiver().value);
 
         // require_auth(user);

@@ -1,6 +1,25 @@
 #if DEBUG
-
+	.output CheckFakeNotify
 #endif
 
+.output FakeNotifyViolation
 
-OnTransferEOSAction
+
+.decl CheckFakeNotify(action: Function, insn: Insn)
+
+// check the comparison of 2nd parameter and _self
+CheckFakeNotify(action, insn):-
+	OnTransferEOSAction(_, action),
+	_AssignType(insn, to, "Ne"),
+	_AssignVar(insn, to, var),
+	pointer.VarPointsTo(var, cat(action, "_1")),
+	_AssignVar(insn, to, var2),
+	var != var2,
+	pointer.VarPointsTo(var2, "_self").
+
+
+.decl FakeNotifyViolation(action: Function)
+
+FakeNotifyViolation(action):-
+	OnTransferEOSAction(_, action),
+	!CheckFakeNotify(action, _).

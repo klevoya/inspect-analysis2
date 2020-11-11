@@ -14,7 +14,8 @@ Three layers:
 
 #if DEBUG
 	#if VERBOSE
-		.output SafeIntraDBOps
+		.output SafeDBOps
+		.output SafeDBOpsInAction
 		.output PossibleAuthViolation
 		.output PayerInFunc
 		.output PayerInFuncCallPointsTo
@@ -26,7 +27,7 @@ Three layers:
 
 /* Auth Check */
 
-.decl AuthViolation(insn: Insn)
+.decl AuthViolation(action: Function, insn: Insn)
 
 /* Violation: 
 1. DB Insn
@@ -45,12 +46,12 @@ auth_dom_db.Target(target):-
 
 
 
-/* Intra-procedural rules*/
 
-.decl SafeIntraDBOps(dbInsn: Insn)
+.decl SafeDBOps(dbInsn: Insn)
 
 // only safe if the users are the same in both instructions
-SafeIntraDBOps(dbInsn):-
+// intra-procedural
+SafeDBOps(dbInsn):-
 	auth_dom_db.IntraSrcDomTarget(check, dbInsn),
 	_ActualArgs(check, "require_auth", 0, authVar),
 	DBInsn(dbInsn, payerVar),
@@ -58,13 +59,19 @@ SafeIntraDBOps(dbInsn):-
 	pointer.VarPointsTo(payerVar, user).
 
 
+// db_update with self
+SafeDBOps(dbInsn):-
+	DBUpdateSamePayer(dbInsn),
+	(auth_dom_db.IntraSrcDomTarget(_, dbInsn);
+	auth_dom_db.InterSrcDomTarget(_, dbInsn)).
+
 
 // Result obtianed from  intra-procedrual analysis
 .decl PossibleAuthViolation(insn: Insn)
 
 PossibleAuthViolation(insn):-
 	DBInsn(insn, _),
-	!SafeIntraDBOps(insn).
+	!SafeDBOps(insn).
 
 
 
@@ -92,14 +99,25 @@ AuthVarForDB(check, var, dbInsn):-
 	Expect violation at 4
 */
 
-// If miss some payer auths 
 
-AuthViolation(dbInsn):-
+.decl SafeDBOpsInAction(action: Function, dbInsn: Insn)
+
+SafeDBOpsInAction(action, dbInsn):-
+	PossibleAuthViolation(dbInsn),
+	AuthVarForDB(authInsn, to, dbInsn),
+	DBInsn(dbInsn, payer),
+	pointer.VarPointsTo(payer, to),
+	ActionFuncReachable(action, _, authInsn),
+	ActionFuncReachable(action, _, dbInsn).
+
+// If miss some payer auths 
+AuthViolation(action, dbInsn):-
 	PossibleAuthViolation(dbInsn),
 	!AuthVarForDB(_, to, dbInsn),
+	!SafeDBOpsInAction(action, dbInsn),
 	DBInsn(dbInsn, payer),
-	pointer.VarPointsTo(payer, to).
-
+	pointer.VarPointsTo(payer, to),
+	ActionFuncReachable(action, _, dbInsn).
 
 /* Flow Sensitive rules*/
 
@@ -141,10 +159,11 @@ PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	pointer.VarPointsTo(actualVar, to).
 
 // For mixed order
-AuthViolation(dbInsn):-
+AuthViolation(action, dbInsn):-
 	PayerInFuncCallPointsTo(dbInsn, to, funcCall),
 	!auth_dom_db.SrcDomFunc(check, _, funcCall),
 	_ActualArgs(check, "require_auth", 0, authVar),
-	pointer.VarPointsTo(authVar, to).
+	pointer.VarPointsTo(authVar, to),
+	ActionFuncReachable(action, _, dbInsn).
 
 
