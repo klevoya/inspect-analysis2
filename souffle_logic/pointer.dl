@@ -128,7 +128,7 @@ StoreActionParamAddress(insn, dyn_offset, offset, address_var, n + 1, param):-
 	_Store(insn, dyn_offset, offset, address_var), 
 	// the store statement for action param / address
 	(StoreActionParam(_, stored_dyn_offset_1, stored_offset, param), n = 0;
-	StoreActionParamAddress(stored_insn, stored_dyn_offset_1, stored_offset, _, n, param)),
+	StoreActionParamAddress(_, stored_dyn_offset_1, stored_offset, _, n, param)),
 	_VarPointsTo(address_var, base),
 	// address points to the same place
 	_AssignVar(_, base, stored_dyn_offset_2),

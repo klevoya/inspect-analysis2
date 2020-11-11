@@ -22,8 +22,11 @@ PossibleFakeToken(action):-
 
 .decl CheckFakeToken(insn: Insn)
 
+// Check if _code is used for testing
+// can restrict it to only "EOSIO.token"
 CheckFakeToken(insn):-
-	_AssignType(insn, to, "Ne"),
+	(_AssignType(insn, to, "Ne");
+	_AssignType(insn, to, "Eq")),
 	_AssignVar(insn, to, from),
 	pointer.VarPointsTo(from, "_code").
 

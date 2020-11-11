@@ -18,6 +18,7 @@ e.g.	Actions, DBInsn etc
 	.output ActionParam
 	.output AllActionParam
 	.output ActionFuncReachable
+	.output CheckNotify
 	.output OnTransferAction
 	.output OnTransferEOSAction
 	.output DBAction
@@ -35,6 +36,21 @@ Action(insn, action):-
 
 
 /* Action Parameters */
+/* Example:
+$il = $eu (get_local[3])
+$im = 40.0
+$in = $il + $im
+$io = $if (get_local[2])
+$ip = 8.0
+($iq) = memcpy($in, $io, $ip)
+
+...
+$iw = $eu (get_local[3])
+$ix = load(dyn_offset: $iw + memarg.offset: 40)
+
+$ix -> parameter
+*/
+
 .decl ActionData(action: Function, var: Var)
 
 ActionData(action, var):-
@@ -124,12 +140,31 @@ ActionFuncReachable(action, to, insn):-
 
 /* Type of Action */
 
+.decl CheckNotify(insn: Insn, toBranch: Insn)
+
+CheckNotify(insn, toBranch):-
+	_FuncInsn("apply", insn),
+	// the false branch of _self == _code
+	_Branch(insn, toBranch, _, ifVar),
+	_AssignType(_, ifVar, "Eq"),
+	_AssignVar(_, ifVar, x),
+	pointer.VarPointsTo(x, "_self"),
+	_AssignVar(_, ifVar, y),
+	x != y,
+	pointer.VarPointsTo(y, "_code").
+
 .decl CheckTransfer(insn: Insn, toBranch: Insn)
 
 CheckTransfer(insn, toBranch):-
 	_SimpleAssign(_, transferVar, "-3.6171687602778276E18"),
 	_AssignVar(_, ifVar, transferVar),
-	_Branch(insn, _, toBranch, ifVar).
+	_Branch(insn, _, toBranch, ifVar),
+	// check is after checking _self != _code 
+	// eliminate action named 'transfer'
+	CheckNotify(_, notifyHead),
+	DominateBB(notifyHead, transferHead),
+	BasicBlockHead(transferHead, insn).
+
 
 .decl CheckEOSIO(insn: Insn, toBranch: Insn)
 
@@ -270,8 +305,8 @@ DBDataAddress(insn, from, len):-
 DBData(insn, var):-
 	DBDataAddress(insn, dynOffset, offset),
 	_Store(_, storeDynOffset, storeOffset, var),
-	_AssignVar(_, dynOffset, base),
-	_AssignVar(_, storeDynOffset, base),
-	to_number(offset) = storeOffset.
+	pointer.VarPointsTo(dynOffset, base),
+	pointer.VarPointsTo(storeDynOffset, base),
+	to_number(offset) >= storeOffset.
 
 
