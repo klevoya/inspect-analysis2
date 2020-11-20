@@ -69,3 +69,6 @@ GET_REL_FROM_FILE(_ActualReturn, "must/fnCallRtn.facts")
 .decl _MemCopy(insn: Insn, to:Var, from:Var, len: Var)
 GET_REL_FROM_FILE(_MemCopy, "must/memcpy.facts")
 
+.decl _Phi(insn: Insn, to:Var, from:Var)
+GET_REL_FROM_FILE(_Phi, "must/phi.facts")
+

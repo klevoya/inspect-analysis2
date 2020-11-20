@@ -34,7 +34,7 @@ OverflowCheck(result):-
 	_AssignType(_, bool, "LeX"),
 	_AssignVar(_, bool, var),
 	_AssignVar(_, bool, other),
-	_SimpleAssign(_, other, "-4.6116860184273879E18").
+	_SimpleAssign(_, other, "-4611686018427387904").
 
 .decl UnderflowCheck(var:Var)
 UnderflowCheck(result):-
@@ -43,7 +43,7 @@ UnderflowCheck(result):-
 	_AssignType(_, bool, "LtX"),
 	_AssignVar(_, bool, var),
 	_AssignVar(_, bool, other),
-	_SimpleAssign(_, other, "4.6116860184273879E18").
+	_SimpleAssign(_, other, "4611686018427387904").
 
 
 .decl OverflowViolation(action: Function, insn: Insn)
@@ -52,5 +52,7 @@ OverflowViolation(action, insn):-
 	PossibleOverflow(insn, result),
 	(!OverflowCheck(result);
 	!UnderflowCheck(result)),
+	DBData(_, var),
+	pointer.VarPointsTo(var, result),
 	_FuncInsn(function,insn),
 	ActionFuncReachable(action, function, _).

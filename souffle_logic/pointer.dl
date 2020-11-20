@@ -26,6 +26,9 @@ _AssignType(insn, var, "Copy"):-
 	_FormalArgs(_, "apply", 1, var),
 	insn = "apply_code".
 
+_AssignVar(insn, to, from),
+_AssignType(insn, to, "Copy"):-
+	_Phi(insn, to, from).
 
 .decl RootVar(var: Var)
 
@@ -137,7 +140,7 @@ StoreActionParamAddress(insn, dyn_offset, offset, address_var, n + 1, param):-
 	// the stored offset is same
 	_AssignVar(_,base, offset_var),
 	_SimpleAssign(_, offset_var, num),
-	stored_offset = to_number(num).
+	to_string(stored_offset) = num.
 	
 
 // load by calculating offset for stored address

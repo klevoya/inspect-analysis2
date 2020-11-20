@@ -11,7 +11,9 @@ e.g.	Actions, DBInsn etc
 		.output _DBInsn
 		.output ActionData
 		.output _DBDataAddress
-		.output DBDataAddress
+		.output DBDataAddress1
+		.output DBDataAddress2
+		.output DBDataAddress3
 	#endif
 	.output Action
 	.output ActionParam
@@ -157,7 +159,7 @@ CheckNotify(insn, toBranch):-
 .decl CheckTransfer(insn: Insn, toBranch: Insn)
 
 CheckTransfer(insn, toBranch):-
-	_SimpleAssign(_, transferVar, "-3.6171687602778276E18"),
+	_SimpleAssign(_, transferVar, "-3617168760277827584"),
 	_AssignVar(_, ifVar, transferVar),
 	_Branch(insn, _, toBranch, ifVar),
 	// check is after checking _self != _code 
@@ -170,7 +172,7 @@ CheckTransfer(insn, toBranch):-
 .decl CheckEOSIO(insn: Insn, toBranch: Insn)
 
 CheckEOSIO(insn, toBranch):-
-	_SimpleAssign(_, eosVar, "6.1386635915927654E18"),
+	_SimpleAssign(_, eosVar, "6138663591592764928"),
 	_AssignVar(_, ifVar, eosVar),
 	_Branch(insn, _, toBranch, ifVar).
 
@@ -224,7 +226,7 @@ DBRemove(removeInsn, payer):-
 DBUpdateSamePayer(insn):-
 	_DBUpdate(insn, _, payer, _),
 	pointer.VarPointsTo(payer, var),
-	_SimpleAssign(_, var, "0.0").
+	_SimpleAssign(_, var, "0").
 
 .decl _DBInsn(insn: Insn, payer: Var)
 
@@ -275,12 +277,16 @@ $vq = $vo + $vp
 
 */
 
+// Done via either memcpy or store the address that stores the data
+
 // The one used for dbOps
+// address with offset
 .decl _DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
 
 _DBDataAddress(insn, dynOffset, offset):-
 	(_DBUpdate(insn, _, _, address);
 	_DBStore(insn, _, _, _, address)),
+	_AssignType(_, address, "Add"),
 	_AssignVar(_, address, dynOffset),
 	_AssignVar(_, address, memarg),
 	_SimpleAssign(_, memarg, offset),
@@ -288,26 +294,78 @@ _DBDataAddress(insn, dynOffset, offset):-
 
 
 // The one that used for memcpy
-.decl DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
+// when the address is form of x = y + z
+.decl DBDataAddress1(insn: Insn, dynOffset: Var)
 
-DBDataAddress(insn, from, len):-
+DBDataAddress1(insn, from):-
 	_DBDataAddress(insn, dynOffset1, offset),
-	_MemCopy(_, to, from, lenVar),
-	_SimpleAssign(_, lenVar, len),
+	_MemCopy(_, to, from, _),
 	_AssignVar(_, to, dynOffset2),
 	_AssignVar(_, to, memarg),
 	_SimpleAssign(_, memarg, offset),
 	_AssignVar(_, dynOffset1, base),
 	_AssignVar(_, dynOffset2, base).
 
+
+// when address is the form of x = y
+.decl DBDataAddress2(insn: Insn, dynOffset: Var)
+
+DBDataAddress2(insn, from):-
+	(_DBUpdate(insn, _, _, address);
+	_DBStore(insn, _, _, _, address)),
+	_AssignType(_, address, "Copy"),
+	pointer.VarPointsTo(address, base),
+	pointer.VarPointsTo(to, base),
+	_MemCopy(_, to, from, _).
+
+
+// when address is used directly to store data address
+.decl DBDataAddress3(insn: Insn, var: Var)
+
+DBDataAddress3(insn, var):-
+	(_DBUpdate(insn, _, _, address);
+	_DBStore(insn, _, _, _, address)),
+	_AssignType(_, address, "Copy"),
+	_AssignVar(_, address, base),
+	_Store(_, storeDynOffset, _, var),
+	_AssignVar(_, storeDynOffset, base).
+
+
 // The actual data
 .decl DBData(insn: Insn, var: Var)
 
 DBData(insn, var):-
-	DBDataAddress(insn, dynOffset, offset),
-	_Store(_, storeDynOffset, storeOffset, var),
-	pointer.VarPointsTo(dynOffset, base),
-	pointer.VarPointsTo(storeDynOffset, base),
-	to_number(offset) >= storeOffset.
+	(DBDataAddress1(insn, dynOffset);
+	DBDataAddress2(insn, dynOffset)),
+	_Store(_, storeDynOffset, _, var),
+	_AssignVar(_, dynOffset, base),
+	_AssignVar(_, storeDynOffset, base).
+
+
+// when there memarg.offset != 0
+DBData(insn, var):-
+	DBDataAddress3(insn, addressVar),
+	// dynOffset = base
+	// offset = num1
+	// addressVar = dynOffset + offset
+	_AssignVar(_, addressVar, dynOffset),
+	_AssignVar(_, dynOffset, base),
+	_AssignVar(_, addressVar, offset),
+	_SimpleAssign(_, offset, num1),
+	_Store(_, storeDynOffset, num2, var),
+	_AssignVar(_, storeDynOffset, base),
+	to_number(num1) = num2.
+
+
+// when there memarg.offset == 0
+DBData(insn, var):-
+	DBDataAddress3(insn, addressVar),
+	// addressVar = dynOffset
+	_AssignVar(_, addressVar, base),
+	_Store(_, dynOffset, 0, var),
+	_AssignVar(_, dynOffset, base).
+	
+
+
 
 
