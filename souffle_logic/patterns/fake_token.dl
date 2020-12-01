@@ -6,14 +6,6 @@
 .output FakeTokenViolation
 
 
-/* Issues:
-1. Actions named "transfer" are identified as an on_notify action, 
-which triggers the pattern.
-
-*/
-
-
-
 .decl PossibleFakeToken(func: Function)
 
 PossibleFakeToken(action):-

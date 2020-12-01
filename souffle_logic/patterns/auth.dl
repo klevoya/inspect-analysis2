@@ -100,8 +100,24 @@ AuthVarForDB(check, var, dbInsn):-
 */
 
 
-.decl SafeDBOpsInAction(action: Function, dbInsn: Insn)
 
+.decl SafeDBOpsInAction(action: Function, dbInsn: Insn)
+/*
+	Action1(){
+		1: require_auth (A) // Auth(A)
+		2: Func2(A)
+		3: Func3(B)
+	}
+
+	Action2(){
+		4: require_auth (A) // Auth(A)
+		5: Func3(A)
+	}
+
+	Func3(C){
+		6: DbOps(C) // C -> A, C -> B
+	}
+*/
 SafeDBOpsInAction(action, dbInsn):-
 	PossibleAuthViolation(dbInsn),
 	AuthVarForDB(authInsn, to, dbInsn),

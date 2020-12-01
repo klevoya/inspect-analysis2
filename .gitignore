@@ -10,3 +10,4 @@ benchmark/BancorX
 profile
 **.abi
 **__pycache__/
+binaries/inspect.jar

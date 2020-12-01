@@ -21,6 +21,15 @@
 */
 
 
+/* Case (Simple: passed)
+	apply(){
+		if(code == receiver){
+			action(); // reachable from br1
+		}else{
+			action(); // reachable from br2 
+		}
+	}
+*/
 
 .decl CodeEqReceiverVar(var: Var)
 
@@ -45,17 +54,6 @@ IfCodeEqReceiver(if, true_br, false_br):-
 	_Branch(if, true_br, false_br, to),
 	_FuncInsn("apply", if).
 
-
-/* Case (Simple: passed)
-	apply(){
-		if(code == receiver){
-			action(); // reachable from br1
-		}else{
-			action(); // reachable from br2 
-		}
-	}
-*/
-
 /* Case (False Positive: Fixed by restrict false branch)
 	apply(){
 		if(code == receiver){
@@ -65,18 +63,6 @@ IfCodeEqReceiver(if, true_br, false_br):-
 	}
 	
 */ 
-
-/* Case (Double Fence: Fixed by checking innermost condition)
-	apply(){
-		if(code == receiver && action == ""){
-			action();
-		}
-
-		if(code == receiver){
-			action();
-		}
-	}
-*/
 
 .decl _ActionInTrueBranch(if: Insn, br: Insn, call: Insn, action: Function)
 .decl _ActionInFalseBranch(if: Insn, br: Insn, call: Insn, action: Function)
@@ -104,6 +90,19 @@ _ActionInFalseBranch(if, br, call, action):-
 	BasicBlockHead(callHead, call),
 	DominateBB(br, callHead),
 	ReachableBtwBB(br, callHead).
+
+
+/* Case (Double Fence: Fixed by checking innermost condition)
+	apply(){
+		if(code == receiver && action == ""){
+			action();
+		}
+
+		if(code == receiver){
+			action();
+		}
+	}
+*/
 
 
 .decl OverriddenTrueBranch(br: Insn)

@@ -67,14 +67,14 @@ ActionData(action, from):-
 	_AssignType(_, to, "Copy").
 	
 
-.comp Order<Sort, Node>{
-	.decl Nodes(sort: Sort, node: Node)
-	.decl Less(sort: Sort, x: Node, y: Node)
-	.decl Leg(sort: Sort, x: Node, y: Node)
-	.decl Next(sort: Sort, x: Node, y: Node)
-	.decl First(sort: Sort, x: Node)
-	.decl Last(sort: Sort, x: Node)
-
+.comp Order<Sort, Key>{
+	.decl Nodes(sort: Sort, key: Key)
+	.decl Less(sort: Sort, x: Key, y: Key)
+	.decl Leg(sort: Sort, x: Key, y: Key)
+	.decl Next(sort: Sort, x: Key, y: Key)
+	.decl First(sort: Sort, x: Key)
+	.decl Last(sort: Sort, x: Key)
+ 
 	Less(s, x, y):-
 		Nodes(s, x),
 		Nodes(s, y),

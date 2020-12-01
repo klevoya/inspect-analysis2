@@ -140,7 +140,8 @@ StoreActionParamAddress(insn, dyn_offset, offset, address_var, n + 1, param):-
 	// the stored offset is same
 	_AssignVar(_,base, offset_var),
 	_SimpleAssign(_, offset_var, num),
-	to_string(stored_offset) = num.
+	to_string(stored_offset) = num,
+	n < 5.
 	
 
 // load by calculating offset for stored address
@@ -175,7 +176,7 @@ LoadActionParam(insn, to, from):-
 	_VarPointsTo(store_dyn_offset, address),
 	_VarPointsTo(load_dyn_offset, address).
 
-// load parameter by computing the offset (TODO: auth_update.wasm)
+// load parameter by computing the offset 
 LoadActionParam(insn, to, from):-
 	StoreActionParam(_, store_dyn_offset, store_offset, from),
 	_Load(insn, load_address_var, load_offset, to),

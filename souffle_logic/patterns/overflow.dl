@@ -26,9 +26,8 @@ PossibleOverflow(insn, result):-
 	_AssignType(insn, result, "Add")).
 
 
-.decl OverflowCheck(var:Var)
-
-OverflowCheck(result):-
+.decl UnderflowCheck(var:Var)
+UnderflowCheck(result):-
 	PossibleOverflow(_, result),
 	pointer.VarPointsTo(var, result),
 	_AssignType(_, bool, "LeX"),
@@ -36,8 +35,8 @@ OverflowCheck(result):-
 	_AssignVar(_, bool, other),
 	_SimpleAssign(_, other, "-4611686018427387904").
 
-.decl UnderflowCheck(var:Var)
-UnderflowCheck(result):-
+.decl OverflowCheck(var:Var)
+OverflowCheck(result):-
 	PossibleOverflow(_, result),
 	pointer.VarPointsTo(var, result),
 	_AssignType(_, bool, "LtX"),
