@@ -1,7 +1,9 @@
 /* 
+Rollback
 
-Applicable to all actions
-
+Strategy: 
+1. Inline Action
+2. Not to _self
 */
 
 
@@ -12,6 +14,7 @@ Applicable to all actions
 
 .output RollbackViolation
 
+/* Rollback in actions with DBOps */
 .decl DBRollback(sendInsn: Insn, contract: Var)
 
 // actions with both send_inline and dbOps
@@ -21,6 +24,7 @@ DBRollback(sendInsn, contract):-
 	DBAction(action).
 	
 
+/* contract name in a send_inline insn */
 .decl InlineContract(sendInsn: Insn, name: Var)
 
 InlineContract(sendInsn, name):-
@@ -38,7 +42,7 @@ InlineContract(sendInsn, name):-
 	_Store(_, offset, 64, name), // contract name
 	pointer.VarPointsTo(offset, obj).
 	
-
+/* violation */
 .decl RollbackViolation(action: Function, insn: Insn)
 
 RollbackViolation(action, insn):-

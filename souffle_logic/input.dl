@@ -1,71 +1,89 @@
-#include "../smt_files/util-macros.dl"
+#include "util-macros.dl"
 
 .type Var <: symbol
 .type Index <: number
 .type Insn <: symbol
 .type Function <: symbol
 
+/* db_store insn */
 .decl _DBStore(insn: Insn, itr:Var, payer:Var, key:Var, data:Var)
 GET_REL_FROM_FILE(_DBStore, "must/dbstore.facts")
 
+/* db_update insn */
 .decl _DBUpdate(insn: Insn, itr: Var, payer: Var, data: Var)
 GET_REL_FROM_FILE(_DBUpdate, "must/dbupdate.facts")
 
+/* insn: to <- from */
 .decl _AssignVar(insn: Insn, to: Var, from: Var)
 GET_REL_FROM_FILE(_AssignVar, "must/assignVar.facts")
 
+/* assignment type */
 .decl _AssignType(insn: Insn, to: Var, type: symbol)      
 GET_REL_FROM_FILE(_AssignType, "must/assignType.facts")
 
+/* simple assignment with integers */
 .decl _SimpleAssign(insn: Insn, to: Var, num: symbol)
 GET_REL_FROM_FILE(_SimpleAssign, "must/simpleAssign.facts")
 
+/* load insn: to = load(dynOffset + memargOffset) */
 .decl _Load(insn: Insn, dynOffset: Var, memargOffset: number, to: Var)
 GET_REL_FROM_FILE(_Load, "must/mload.facts")
 
+/* store insn:  store(dynOffset + memargOffset) = from */
 .decl _Store(insn: Insn, dynOffset: Var, memargOffset: number, from: Var)
 GET_REL_FROM_FILE(_Store, "must/mstore.facts")
 
-// Mapping of each instruction to its containing function
+/* mapping of each insn to its function */
 .decl _FuncInsn(func: Function, insn: Insn)
 GET_REL_FROM_FILE(_FuncInsn, "must/fnInstr.facts")
 
+/* linear insns: prev -> next */
 .decl _Follows(prev: Insn, next: Insn)
 GET_REL_FROM_FILE(_Follows, "must/follows2.facts")
 
+/* from: goto 'to' */
 .decl _Goto(from: Insn, to: Insn)
 GET_REL_FROM_FILE(_Goto, "must/goto.facts")
 
+/* diverging point with boolean condition */
 .decl _Branch(from: Insn, f_branch: Insn, t_branch: Insn, cond: Var)
 GET_REL_FROM_FILE(_Branch, "must/branch.facts")
 
+/* merge point of an if insn */
 .decl _EndIf(ifInsn:Insn, endInsn:Insn)
 GET_REL_FROM_FILE(_EndIf, "must/endIf2.facts")
 
+/* branch table with condition */
 .decl _BranchTable(ifInsn:Insn, branch:Insn, cond: Var)
 GET_REL_FROM_FILE(_BranchTable, "must/branchTable.facts")
 
-// Captures the actual arguments at the invocation of a function
+/* captures the actual arguments at the invocation of a function */
 .decl _ActualArgs(callSite: Insn, func: Function, index: Index, arg: Var)
 GET_REL_FROM_FILE(_ActualArgs, "must/fnCallArgument.facts")
 
-// Function call from given label i.e. invocation site
+/* function call from given label i.e. invocation site */
 .decl _FuncCall(callSite: Insn, from: Function, to: Function)
 GET_REL_FROM_FILE(_FuncCall, "must/fnCall.facts")
 
-// For a formal function definition. Shows which variable is an argument of the
-// function at a certain index, i.e. n-th argument
+/* for a formal function definition. Shows which variable is an argument of the
+function at a certain index, i.e. n-th argument */
 .decl _FormalArgs(funcDef:Insn, func: Function, index: Index, arg: Var)
 GET_REL_FROM_FILE(_FormalArgs, "must/fnDefinitionArgument.facts")
 
-// For a formal function definition. Return value of the function.
+/* return value within the function. */
 .decl _FormalReturn(funcDef:Insn, func: Function, return: Var)
 GET_REL_FROM_FILE(_FormalReturn, "must/fnDefinitionRtn.facts")
 
-// Captures the actual return value at the invocation of a function
+/* captures the actual return value at the invocation of a function */
 .decl _ActualReturn(callSite: Insn, func: Function, return: Var)
 GET_REL_FROM_FILE(_ActualReturn, "must/fnCallRtn.facts")
 
+/* memory copy insn with destination, origin and size, 
+insn: memcpy(to, from, len) */
 .decl _MemCopy(insn: Insn, to:Var, from:Var, len: Var)
 GET_REL_FROM_FILE(_MemCopy, "must/memcpy.facts")
+
+/* converging node to merge multiple assignments to the same variable in branches */
+.decl _Phi(insn: Insn, to:Var, from:Var)
+GET_REL_FROM_FILE(_Phi, "must/phi.facts")
 

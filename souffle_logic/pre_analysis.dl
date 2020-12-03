@@ -1,18 +1,22 @@
-/* EOS related pre-analysis 
-e.g.	Actions, DBInsn etc
-*/
+/*****************************
+** EOS related pre-analysis **
+** e.g. Actions, DBInsn etc **
+******************************/
 
 #if DEBUG
 	#if VERBOSE
 		.output CheckTransfer
 		.output CheckEOSIO
-		.output DBRemove
+		.output DBFindReachable
 		.output DBUpdateSamePayer
 		.output _DBInsn
 		.output ActionData
 		.output _DBDataAddress
-		.output DBDataAddress
+		.output DBDataAddress1
+		.output DBDataAddress2
+		.output DBDataAddress3
 	#endif
+	.output DBRemove
 	.output Action
 	.output ActionParam
 	.output AllActionParam
@@ -27,7 +31,11 @@ e.g.	Actions, DBInsn etc
 
 .output ActionCondition
 
-/* Action Related */
+/***********
+** Action **
+************/
+
+/* functions that are actions */
 .decl Action(call: Insn, action: Function)
 
 Action(insn, action):-
@@ -35,8 +43,10 @@ Action(insn, action):-
 	_FuncCall(_, action, "read_action_data"). 
 
 
+/******************
+** Action Params **
+*******************/
 
-/* Action Parameters */
 /* Example:
 $il = $eu (get_local[3])
 $im = 40.0
@@ -52,6 +62,7 @@ $ix = load(dyn_offset: $iw + memarg.offset: 40)
 $ix -> parameter
 */
 
+/* Action data including parameters */
 .decl ActionData(action: Function, var: Var)
 
 ActionData(action, var):-
@@ -64,15 +75,15 @@ ActionData(action, from):-
 	_AssignVar(_, to, from),
 	_AssignType(_, to, "Copy").
 	
-
-.comp Order<Sort, Node>{
-	.decl Nodes(sort: Sort, node: Node)
-	.decl Less(sort: Sort, x: Node, y: Node)
-	.decl Leg(sort: Sort, x: Node, y: Node)
-	.decl Next(sort: Sort, x: Node, y: Node)
-	.decl First(sort: Sort, x: Node)
-	.decl Last(sort: Sort, x: Node)
-
+/* Component to order nodes within groups in descending for iteration */
+.comp Order<Group, Node>{
+	.decl Nodes(group: Group, key: Node)
+	.decl Less(group: Group, x: Node, y: Node)
+	.decl Leg(group: Group, x: Node, y: Node)
+	.decl Next(group: Group, x: Node, y: Node)
+	.decl First(group: Group, x: Node)
+	.decl Last(group: Group, x: Node)
+ 
 	Less(s, x, y):-
 		Nodes(s, x),
 		Nodes(s, y),
@@ -95,13 +106,17 @@ ActionData(action, from):-
 		!Less(s, x, _).
 }
 
+/* all action parameters, offset is the memeory location */ 
 .decl _ActionParam(action: Function, base: Var, offset: symbol)
 
+// data = var + offset
 _ActionParam(action, base, num):-
 	ActionData(action, data),
+	// var
 	_AssignVar(_, data, var),
 	_AssignType(_, var, "Copy"),
 	_AssignVar(_, var, base),
+	// offset
 	_AssignVar(_, data, offset),
 	_SimpleAssign(_, offset, num).
 
@@ -111,24 +126,33 @@ _ActionParam(action, base, num):-
 order.Nodes(action, num):-
 	_ActionParam(action, _, num).
 
+/* action parameters and its index */
 .decl ActionParam(action: Function, base: Var, offset: symbol, index: number)
 
+// first parameter
 ActionParam(action, base, offset, 0):-
 	_ActionParam(action, base, offset),
 	order.Last(action, offset).
 
+// the rest
 ActionParam(action, base, offset, n+1):-
 	ActionParam(action, base, next, n),
 	order.Next(action, offset, next).
 
-// easy to access action parameter name
+/* easy to access action parameter name,
+	not presented in the actual code  */
 .decl AllActionParam(action: Function, index: number, name: Var)
 
 AllActionParam(action, index, cat(cat(action, "_"), to_string(index))):-
 	ActionParam(action, _, _, index).
 
-/* Action Reachable */
-.decl ActionFuncReachable(from: Function, to: Function, insn: Insn)
+
+/***********************
+** Reachable function **
+************************/
+
+/* function calls that are reachable from the action*/
+.decl ActionFuncReachable(from: Function, to: Function, func_call: Insn)
 
 ActionFuncReachable(action, to, insn):-
 	Action(_, action),
@@ -139,8 +163,12 @@ ActionFuncReachable(action, to, insn):-
 	_FuncCall(insn, mid, to).
 
 
-/* Type of Action */
+/*****************
+** Action Types **
+******************/
 
+/* checking if an action is notifiable,
+actions called in toBranch are notifiable */
 .decl CheckNotify(insn: Insn, toBranch: Insn)
 
 CheckNotify(insn, toBranch):-
@@ -154,10 +182,12 @@ CheckNotify(insn, toBranch):-
 	x != y,
 	pointer.VarPointsTo(y, "_code").
 
+/* check if action is notifiable on transfer,
+actions called in toBranch are notifiable on transfer */
 .decl CheckTransfer(insn: Insn, toBranch: Insn)
 
 CheckTransfer(insn, toBranch):-
-	_SimpleAssign(_, transferVar, "-3.6171687602778276E18"),
+	_SimpleAssign(_, transferVar, "-3617168760277827584"),
 	_AssignVar(_, ifVar, transferVar),
 	_Branch(insn, _, toBranch, ifVar),
 	// check is after checking _self != _code 
@@ -166,15 +196,17 @@ CheckTransfer(insn, toBranch):-
 	DominateBB(notifyHead, transferHead),
 	BasicBlockHead(transferHead, insn).
 
-
+/* check if action is notifiable by eosio.token,
+actions called in toBranch are notifiable by eosio.token */
 .decl CheckEOSIO(insn: Insn, toBranch: Insn)
 
 CheckEOSIO(insn, toBranch):-
-	_SimpleAssign(_, eosVar, "6.1386635915927654E18"),
+	_SimpleAssign(_, eosVar, "6138663591592764928"),
 	_AssignVar(_, ifVar, eosVar),
 	_Branch(insn, _, toBranch, ifVar).
 
 
+/* actions that are notifiable on transfer */
 .decl OnTransferAction(call: Insn, action: Function)
 
 OnTransferAction(call, action):-
@@ -182,6 +214,7 @@ OnTransferAction(call, action):-
 	CheckTransfer(_, toBranch),
 	BasicBlockHead(toBranch, call).
 
+/* actions that are notifiable on transfer by eosio.token */
 .decl OnTransferEOSAction(call: Insn, action: Function)
 OnTransferEOSAction(call, action):-
 	OnTransferAction(call, action),
@@ -189,6 +222,7 @@ OnTransferEOSAction(call, action):-
 	CheckEOSIO(_, checkedHead),
 	DominateBB(checkedHead, callHead).
 
+/* encoded action names are used as the last condiiton before calling action */
 .decl ActionCondition(action: Function, constant: symbol)
 
 ActionCondition(action, constant):-
@@ -198,6 +232,7 @@ ActionCondition(action, constant):-
 	_AssignVar(_, ifVar, constVar),
 	_Branch(_, _, toBranch, ifVar).
 
+/* actions that contains dbOps */
 .decl DBAction(action: Function)
 
 DBAction(action):-
@@ -205,27 +240,52 @@ DBAction(action):-
 	ActionFuncReachable(action, _, dbInsn).
 
 
-/* DB Related */
+/***************
+** DB Related **
+****************/
 
-// DB Remove
-// Unlikely called without DB find
-// So only consider the find and remove that can be called from the same action
+/* DB remove insn and its payer */
 
-.decl DBRemove(insn: Insn, payer: Var)
+/* payer of db_remove is obtained from db_find(s) */
+.decl _DBRemove(removeInsn: Insn, findInsn: Insn, payer: Var)
 
-DBRemove(removeInsn, payer):-
+_DBRemove(removeInsn, findInsn, payer):-
 	ActionFuncReachable(action, "db_remove_i64", removeInsn),
 	ActionFuncReachable(action, "db_find_i64", findInsn),
 	_ActualArgs(findInsn, _, 3, payer).
 
+/* for each db_remove insn, db_find_1 can reach to db_find2 */
+.decl DBFindReachable(removeInsn: Insn, findInsn1: Insn, findInsn2: Insn)
 
+DBFindReachable(removeInsn, findInsn1, findInsn2):-
+	_DBRemove(removeInsn, findInsn1, _),
+	_DBRemove(removeInsn, findInsn2, _ ),
+	findInsn1 != findInsn2,
+	//  reachable in BB
+	(ReachableInBB(findInsn1, findInsn2);
+	// reachable btw BB
+	BasicBlockHead(head1, findInsn1),
+	BasicBlockHead(head2, findInsn2),
+	ReachableBtwBB(head1, head2)).
+
+/* select the closest db_find for db_remove */
+.decl DBRemove(insn: Insn, payer: Var)
+
+DBRemove(removeInsn, payer):-
+	_DBRemove(removeInsn, findInsn, payer),
+	!DBFindReachable(removeInsn, findInsn, _).
+
+
+/* DB update on the same payer */
 .decl DBUpdateSamePayer(insn: Insn)
 
+// when the payer points to '0'
 DBUpdateSamePayer(insn):-
 	_DBUpdate(insn, _, payer, _),
 	pointer.VarPointsTo(payer, var),
-	_SimpleAssign(_, var, "0.0").
+	_SimpleAssign(_, var, "0").
 
+/* all DBOps and their payer variables*/
 .decl _DBInsn(insn: Insn, payer: Var)
 
 _DBInsn(insn, payer):-
@@ -233,25 +293,29 @@ _DBInsn(insn, payer):-
 	_DBUpdate(insn, _, payer, _);
 	DBRemove(insn, payer).
 
-
+/* if payers are _self or _code for easier debug process */
 .decl DBInsn(insn: Insn, payer: Var)
 
-// if dbOp on self
+// if payer is _self
 DBInsn(insn, "_self"):-
 	_DBInsn(insn, payer),
 	pointer.VarPointsTo(payer,"_self").
 
-// if dbOp on code
+// if payer is _code
 DBInsn(insn, "_code"):-
 	_DBInsn(insn, payer),
 	pointer.VarPointsTo(payer,"_code").
 
-// else
+// else keep the same payer var
 DBInsn(insn, payer):-
 	_DBInsn(insn, payer),
 	!pointer.VarPointsTo(payer,"_code"),
 	!pointer.VarPointsTo(payer,"_self").
 
+
+/***************
+** DB Payload **
+****************/
 
 // Example
 /*
@@ -275,12 +339,16 @@ $vq = $vo + $vp
 
 */
 
+// Done via either memcpy or store the address that stores the data
+
 // The one used for dbOps
+// address with offset
 .decl _DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
 
 _DBDataAddress(insn, dynOffset, offset):-
 	(_DBUpdate(insn, _, _, address);
 	_DBStore(insn, _, _, _, address)),
+	_AssignType(_, address, "Add"),
 	_AssignVar(_, address, dynOffset),
 	_AssignVar(_, address, memarg),
 	_SimpleAssign(_, memarg, offset),
@@ -288,26 +356,78 @@ _DBDataAddress(insn, dynOffset, offset):-
 
 
 // The one that used for memcpy
-.decl DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
+// when the address is form of x = y + z
+.decl DBDataAddress1(insn: Insn, dynOffset: Var)
 
-DBDataAddress(insn, from, len):-
+DBDataAddress1(insn, from):-
 	_DBDataAddress(insn, dynOffset1, offset),
-	_MemCopy(_, to, from, lenVar),
-	_SimpleAssign(_, lenVar, len),
+	_MemCopy(_, to, from, _),
 	_AssignVar(_, to, dynOffset2),
 	_AssignVar(_, to, memarg),
 	_SimpleAssign(_, memarg, offset),
 	_AssignVar(_, dynOffset1, base),
 	_AssignVar(_, dynOffset2, base).
 
+
+// when address is the form of x = y
+.decl DBDataAddress2(insn: Insn, dynOffset: Var)
+
+DBDataAddress2(insn, from):-
+	(_DBUpdate(insn, _, _, address);
+	_DBStore(insn, _, _, _, address)),
+	_AssignType(_, address, "Copy"),
+	pointer.VarPointsTo(address, base),
+	pointer.VarPointsTo(to, base),
+	_MemCopy(_, to, from, _).
+
+
+// when address is used directly to store data address
+.decl DBDataAddress3(insn: Insn, var: Var)
+
+DBDataAddress3(insn, var):-
+	(_DBUpdate(insn, _, _, address);
+	_DBStore(insn, _, _, _, address)),
+	_AssignType(_, address, "Copy"),
+	_AssignVar(_, address, base),
+	_Store(_, storeDynOffset, _, var),
+	_AssignVar(_, storeDynOffset, base).
+
+
 // The actual data
 .decl DBData(insn: Insn, var: Var)
 
 DBData(insn, var):-
-	DBDataAddress(insn, dynOffset, offset),
-	_Store(_, storeDynOffset, storeOffset, var),
-	pointer.VarPointsTo(dynOffset, base),
-	pointer.VarPointsTo(storeDynOffset, base),
-	to_number(offset) >= storeOffset.
+	(DBDataAddress1(insn, dynOffset);
+	DBDataAddress2(insn, dynOffset)),
+	_Store(_, storeDynOffset, _, var),
+	_AssignVar(_, dynOffset, base),
+	_AssignVar(_, storeDynOffset, base).
+
+
+// when memarg.offset != 0
+DBData(insn, var):-
+	DBDataAddress3(insn, addressVar),
+	// dynOffset = base
+	// offset = num1
+	// addressVar = dynOffset + offset
+	_AssignVar(_, addressVar, dynOffset),
+	_AssignVar(_, dynOffset, base),
+	_AssignVar(_, addressVar, offset),
+	_SimpleAssign(_, offset, num1),
+	_Store(_, storeDynOffset, num2, var),
+	_AssignVar(_, storeDynOffset, base),
+	to_number(num1) = num2.
+
+
+// when memarg.offset == 0
+DBData(insn, var):-
+	DBDataAddress3(insn, addressVar),
+	// addressVar = dynOffset
+	_AssignVar(_, addressVar, base),
+	_Store(_, dynOffset, 0, var),
+	_AssignVar(_, dynOffset, base).
+	
+
+
 
 

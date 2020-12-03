@@ -70,9 +70,6 @@
     #define UNIQUE(rel) \
         1 = count : { rel }
 
-    // TODO: This is wrong
-    /* #define GET_REL_FROM_FILE(rel, analysis) \
-        .input rel(IO=file, filename= analysis ## rel ## .facts) */
     #define GET_REL_FROM_FILE(rel, path_to_file) \
         .input rel(IO=file, filename=path_to_file)
 #endif

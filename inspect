@@ -17,6 +17,8 @@ def string_from_long(action):
     out_str = ''.join(str)
     return out_str.split('.', 1)[0]
 
+start_time = time.time()
+
 database_dir = "database"
 artefacts_dir = "artefacts"
 
@@ -68,15 +70,24 @@ def print_result(violation_file):
 		print(warn(basename + u'\u2718') if len(reader) else good(basename + u'\u2713')) 
 
 		for row in reader:
-			print(nuetral("Action: ") + action_name[row[0]], end="	")
+			print(nuetral("Action: ") + action_name[row[0]] if row[0] in action_name else row[0], end="	")
 			rest = nuetral("Insn: ") + row[1] if len(row) > 1 else ""
 			print(rest)
 	print()
 
 print(bold("Analysis Result\n"))
+# print("Action Names:")
+# print(action_name, end="\n\n")
 print_result("AuthViolation.csv")
 print_result("RollbackViolation.csv")
 print_result("FakeTokenViolation.csv")
 print_result("FakeNotifyViolation.csv")
 print_result("SeperationViolation.csv")
 print_result("OverflowViolation.csv")
+
+run_time = time.time() - start_time
+run_time_m = str(int(run_time // 60)) + "m "if run_time // 60 > 0 else ""
+run_time_s = str(int(run_time % 60)) + "s"
+# not needed atm, cuz most test cases are under 1 sec
+print(bold("Run Time: ") + run_time_m + run_time_s + END)
+print()

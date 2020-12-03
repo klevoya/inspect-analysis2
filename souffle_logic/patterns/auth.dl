@@ -1,15 +1,14 @@
-
 /* 
+Missing Authorisation
 
-Applicable to actions with DB calls
+Strategy: 
+1. DB Insn
+2. Not preceded by require_auth()
 
-*/
-
-/*
 Three layers:
-	Intra-procedural: only check if the DBOps are dominated by require_auth whithin same function
-	Inter-procedural: only check if require_auth dominate functions with DBOps (payer variables set mataching)
-	Flow sensitive: check if require_auth dominate the function call with the according payer varaible (ordered matching)
+	Intra-procedural: check if the DBOps are dominated by require_auth whithin same function
+	Inter-procedural: check if require_auth dominate functions with DBOps (payer variables set mataching)
+	Flow-sensitive: check if require_auth dominate the function call with the correpsonding payer varaible (ordered matching)
 */
 
 #if DEBUG
@@ -20,22 +19,16 @@ Three layers:
 		.output PayerInFunc
 		.output PayerInFuncCallPointsTo
 	#endif
-	.output AuthVarForDB
+	.output AuthorisedPayerForDB
 #endif
 
 .output AuthViolation
 
-/* Auth Check */
 
+/* violation DBinsn and its actions */
 .decl AuthViolation(action: Function, insn: Insn)
 
-/* Violation: 
-1. DB Insn
-2. Not preceed by require_auth()
-*/
-
-
-// Auth dom dbop wihtin CFG
+/* require_auth dom DBOps wihtin CFG */
 .init auth_dom_db = CFGDom
 
 auth_dom_db.Src(check):-
@@ -46,11 +39,14 @@ auth_dom_db.Target(target):-
 
 
 
+/*********************
+** Intra-procedural **
+**********************/
 
+/* safe DBOps with require_auth within same function */
 .decl SafeDBOps(dbInsn: Insn)
 
-// only safe if the users are the same in both instructions
-// intra-procedural
+// only safe if the payers are the same in both instructions
 SafeDBOps(dbInsn):-
 	auth_dom_db.IntraSrcDomTarget(check, dbInsn),
 	_ActualArgs(check, "require_auth", 0, authVar),
@@ -59,14 +55,14 @@ SafeDBOps(dbInsn):-
 	pointer.VarPointsTo(payerVar, user).
 
 
-// db_update with self
+// db_update with same payer
 SafeDBOps(dbInsn):-
 	DBUpdateSamePayer(dbInsn),
 	(auth_dom_db.IntraSrcDomTarget(_, dbInsn);
 	auth_dom_db.InterSrcDomTarget(_, dbInsn)).
 
 
-// Result obtianed from  intra-procedrual analysis
+// Result obtianed from intra-procedrual analysis
 .decl PossibleAuthViolation(insn: Insn)
 
 PossibleAuthViolation(insn):-
@@ -75,15 +71,47 @@ PossibleAuthViolation(insn):-
 
 
 
-/* Inter-procedural rules*/
+/*********************
+** Inter-procedural **
+**********************/
 
-.decl AuthVarForDB(authInsn: Insn, var: Var, dbInsn: Insn)
+/* payer is authorised before dbInsn */
+.decl AuthorisedPayerForDB(authInsn: Insn, payer: Var, dbInsn: Insn)
 
-AuthVarForDB(check, var, dbInsn):-
+AuthorisedPayerForDB(check, payer, dbInsn):-
 	auth_dom_db.InterSrcDomTarget(check, dbInsn),
 	_ActualArgs(check, "require_auth", 0, authVar),
-	pointer.VarPointsTo(authVar, var).
+	pointer.VarPointsTo(authVar, payer).
 
+
+
+/*  Possible false positive
+	Action1(){
+		1: require_auth (A) // Auth(A)
+		2: Func2(A)
+		3: Func3(B)
+	}
+
+	Action2(){
+		4: require_auth (A) // Auth(A)
+		5: Func3(A)
+	}
+
+	Func3(C){
+		6: DbOps(C) // C -> A, C -> B
+	}
+*/
+
+/* Exempt the actions calling unsafe dbops, but with safe payers */
+.decl SafeDBOpsInAction(action: Function, dbInsn: Insn)
+
+SafeDBOpsInAction(action, dbInsn):-
+	PossibleAuthViolation(dbInsn),
+	AuthorisedPayerForDB(authInsn, to, dbInsn),
+	DBInsn(dbInsn, payer),
+	pointer.VarPointsTo(payer, to),
+	ActionFuncReachable(action, _, authInsn),
+	ActionFuncReachable(action, _, dbInsn).
 
 /* Case:
 	Func1(){
@@ -99,27 +127,19 @@ AuthVarForDB(check, var, dbInsn):-
 	Expect violation at 4
 */
 
-
-.decl SafeDBOpsInAction(action: Function, dbInsn: Insn)
-
-SafeDBOpsInAction(action, dbInsn):-
-	PossibleAuthViolation(dbInsn),
-	AuthVarForDB(authInsn, to, dbInsn),
-	DBInsn(dbInsn, payer),
-	pointer.VarPointsTo(payer, to),
-	ActionFuncReachable(action, _, authInsn),
-	ActionFuncReachable(action, _, dbInsn).
-
-// If miss some payer auths 
+// If miss any payer authorisation 
 AuthViolation(action, dbInsn):-
 	PossibleAuthViolation(dbInsn),
-	!AuthVarForDB(_, to, dbInsn),
+	!AuthorisedPayerForDB(_, to, dbInsn),
 	!SafeDBOpsInAction(action, dbInsn),
 	DBInsn(dbInsn, payer),
 	pointer.VarPointsTo(payer, to),
 	ActionFuncReachable(action, _, dbInsn).
 
-/* Flow Sensitive rules*/
+
+/*******************
+** Flow-sensitive **
+********************/
 
 /* Case
 	Func1(){
@@ -135,7 +155,8 @@ AuthViolation(action, dbInsn):-
 	Expect violation at 5
 */
 
-
+/* reverse propogate payer from dbInsn back to function parameter 
+if it's passed by parameter */
 .decl PayerInFunc(dbInsn: Insn, payerVar: Var, func: Function)
 
 // payerVar in dbOps
@@ -149,7 +170,7 @@ PayerInFunc(dbInsn, to, func):-
 	PayerInFunc(dbInsn, from, func),
 	pointer.IntraCopyAssign(_, from, to).
 
-// capture payer points to if payer is passed by parameters
+/* capture payer points to if payer is passed by parameters */
 .decl PayerInFuncCallPointsTo(dbInsn: Insn, to: Var, funcCall: Insn)
 
 PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
@@ -158,7 +179,7 @@ PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	_ActualArgs(funcCall, func, index, actualVar),
 	pointer.VarPointsTo(actualVar, to).
 
-// For mixed order
+/* For mixed order require_auth and DBOps function call */
 AuthViolation(action, dbInsn):-
 	PayerInFuncCallPointsTo(dbInsn, to, funcCall),
 	!auth_dom_db.SrcDomFunc(check, _, funcCall),

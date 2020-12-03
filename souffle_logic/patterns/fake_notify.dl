@@ -1,3 +1,11 @@
+/* 
+Fake Notification
+
+Strategy: 
+1. on_notify eosio.token:transfer action  
+2. first/second parameter is not checked with _self
+*/
+
 #if DEBUG
 	.output CheckFakeNotify
 #endif
@@ -5,19 +13,22 @@
 .output FakeNotifyViolation
 
 
+/* safe actions with checking statment */
 .decl CheckFakeNotify(action: Function, insn: Insn)
 
-// check the comparison of 2nd parameter and _self
+// check the comparison of 1st/2nd parameter and _self
 CheckFakeNotify(action, insn):-
 	OnTransferEOSAction(_, action),
-	_AssignType(insn, to, "Ne"),
+	(_AssignType(insn, to, "Ne");
+	_AssignType(insn, to, "Eq")),
 	_AssignVar(insn, to, var),
-	pointer.VarPointsTo(var, cat(action, "_1")),
+	(pointer.VarPointsTo(var, cat(action, "_1"));
+	pointer.VarPointsTo(var, cat(action, "_0"))),
 	_AssignVar(insn, to, var2),
 	var != var2,
 	pointer.VarPointsTo(var2, "_self").
 
-
+/* violations */
 .decl FakeNotifyViolation(action: Function)
 
 FakeNotifyViolation(action):-

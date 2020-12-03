@@ -7,11 +7,13 @@
 		.output InterSrcDomTarget
 	#endif
 
-
+	/* input: srcs and targets in the graph */
 	.decl Src(insn: Insn)
 	.decl Target(insn: Insn)
 
-	/**** Intra procedural ****/
+	/*********************
+	** Intra-procedural **
+	**********************/
 
 	.decl IntraSrcDomTarget(src: Insn, target: Insn)
 	
@@ -34,7 +36,7 @@
 
 	/*
 	func(){
-		BB:
+		BB1:
 			src;
 		BB2:
 			target;
@@ -51,7 +53,10 @@
 
 
 
-	/**** Inter procedural ****/
+	/*********************
+	** Inter-procedural **
+	**********************/
+
 	.decl InterSrcDomTarget(src: Insn, target: Insn)
 
 	// must analysis
@@ -70,7 +75,7 @@
 	.decl SrcDomFunc(src: Insn, func: Function, funcCall: Insn)
 
 	/*  Case 1:
-	func1{
+	func1(){
 		src;
 		func2();
 	}
@@ -95,10 +100,10 @@
 		ReachableInBB(src, funcCall).
 
 	/* Case 2:
-	func1{
-		src // if src is alawys executed in the function
+	func1(){
+		src; // if src is always executed in the function
 	}
-	func2{
+	func2(){
 		func1(); 
 		target;
 		....
@@ -130,49 +135,62 @@
 		ReachableInBB(srcCall, target). 
 
 	/* Case 3:
-	srcFunc{
+	srcFunc(){
 		src; // if src is always executed in the function
 	}
-	fromFunc{
+	fromFunc(){
 		srcFunc(); 
-		newFunc();
+		targetFunc();
 	}
-	newFunc(){
+	targetFunc(){
 		target; // may executed
 	}
 	*/
 
-	// src, newFunc
+	// src, targetFunc
 
-	// srcFunc and newFunc are in different BB
-	SrcDomFunc(src, newFunc, newFuncCall):-
+	// srcFunc and targetFunc are in different BB
+	SrcDomFunc(src, targetFunc, targetFuncCall):-
 		Src(src),
 		_FuncInsn(srcFunc, src),
 		#if MayAnalysis
 		MustSrcInFunc(srcFunc),
 		#endif
 		_FuncCall(srcCall, fromFunc, srcFunc),
-		_FuncCall(newFuncCall, fromFunc, newFunc),
-		BasicBlockHead(newFuncHead, newFuncCall),
+		_FuncCall(targetFuncCall, fromFunc, targetFunc),
+		BasicBlockHead(newFuncHead, targetFuncCall),
 		BasicBlockHead(srcHead, srcCall),
 		DominateBB(srcHead, newFuncHead).
 
 
 	// same BB
-	SrcDomFunc(src, newFunc, newFuncCall):-
+	SrcDomFunc(src, targetFunc, targetFuncCall):-
 		Src(src),
 		_FuncInsn(srcFunc, src),
 		#if MayAnalysis
 		MustSrcInFunc(srcFunc),
 		#endif
 		_FuncCall(srcCall, fromFunc, srcFunc),
-		_FuncCall(newFuncCall, fromFunc, newFunc),
-		ReachableInBB(srcCall, newFuncCall).
+		_FuncCall(targetFuncCall, fromFunc, targetFunc),
+		ReachableInBB(srcCall, targetFuncCall).
 		
-	// recursion, can be overlooked for performance
-	SrcDomFunc(src, newFunc, newFuncCall):-
+	// recursion for multiple function calls
+	/* Example:
+		fromFunc(){
+			src;
+			Func1();
+		}
+		Func1(){
+			Func2();
+		}
+		...
+		FuncN(){
+			target;
+		}
+	*/
+	SrcDomFunc(src, targetFunc, targetFuncCall):-
 		SrcDomFunc(src, fromFunc, _),
-		_FuncCall(newFuncCall, fromFunc, newFunc).
+		_FuncCall(targetFuncCall, fromFunc, targetFunc).
 
 	// Case 1 & 3
 	InterSrcDomTarget(src, target):-
