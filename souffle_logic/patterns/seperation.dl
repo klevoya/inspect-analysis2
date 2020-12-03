@@ -1,40 +1,41 @@
+/* 
+Seperation of Action and Notification
+
+Strategy: 
+1. action can be reached from reciever == code
+2. action can be reached from reciever != code
+
+Issue: 
+1. May suffer from same body functions due to compiler optimisation
+*/
+
 #if DEBUG
 	.output CodeEqReceiverVar
+	.output CodeNeReceiverVar
+	.output IfCodeNeReceiver
 	.output IfCodeEqReceiver
 
 	#if VERBOSE
-		.output _ActionInTrueBranch
-		.output _ActionInFalseBranch
-		.output ActionInTrueBranch
-		.output ActionInFalseBranch
-		.output OverriddenTrueBranch
-		.output OverriddenFalseBranch
+		.output _ActionInEqBranch
+		.output _ActionInNeBranch
+		.output ActionInEqBranch
+		.output ActionInNeBranch
+		.output OverriddenEqBranch
+		.output OverriddenNeBranch
 	#endif
 #endif
 
 .output SeperationViolation
 
+/*************
+** Booleans **
+**************/
 
-/* Issues:
-1. Actions with same function body are identified as the same action.
-
-*/
-
-
-/* Case (Simple: passed)
-	apply(){
-		if(code == receiver){
-			action(); // reachable from br1
-		}else{
-			action(); // reachable from br2 
-		}
-	}
-*/
-
+/* boolean var stores the result of code == reciever */
 .decl CodeEqReceiverVar(var: Var)
 
 CodeEqReceiverVar(to):-
-	_AssignType(assign, to, "Ne"),
+	_AssignType(assign, to, "Eq"),
 	_AssignVar(assign, to, code_var),
 	_AssignVar(assign, to, receiver_var),
 	code_var != receiver_var,
@@ -46,98 +47,163 @@ CodeEqReceiverVar(to):-
 	_AssignType(_, to, "Copy"),
 	_AssignVar(_, to, from).
 
+/* branches with code == receiver condition */
+.decl IfCodeEqReceiver(if: Insn, false_br: Insn, true_br: Insn)
 
-.decl IfCodeEqReceiver(if: Insn, true_br: Insn, false_br: Insn)
-
-IfCodeEqReceiver(if, true_br, false_br):-
+IfCodeEqReceiver(if,false_br, true_br):-
 	CodeEqReceiverVar(to),
-	_Branch(if, true_br, false_br, to),
+	_Branch(if, false_br, true_br, to),
 	_FuncInsn("apply", if).
+
+
+/* boolean var stores the result of code != reciever */
+.decl CodeNeReceiverVar(var: Var)
+
+CodeNeReceiverVar(to):-
+	_AssignType(assign, to, "Ne"),
+	_AssignVar(assign, to, code_var),
+	_AssignVar(assign, to, receiver_var),
+	code_var != receiver_var,
+	pointer.VarPointsTo(code_var, "_code"),
+	pointer.VarPointsTo(receiver_var, "_self").
+
+CodeNeReceiverVar(to):-
+	CodeNeReceiverVar(from),
+	_AssignType(_, to, "Copy"),
+	_AssignVar(_, to, from).
+
+/* branches with code != receiver condition */
+.decl IfCodeNeReceiver(if: Insn, false_br: Insn, true_br: Insn)
+
+IfCodeNeReceiver(if,false_br, true_br):-
+	CodeNeReceiverVar(to),
+	_Branch(if, false_br, true_br, to),
+	_FuncInsn("apply", if).
+
+
+
+/*************
+** Branches **
+**************/
+
+/* Case (Simple: passed)
+	apply(){
+		if(code != receiver){
+			action(); // reachable from br1
+		}else{
+			action(); // reachable from br2 
+		}
+	}
+*/
+
+/* action calls within two branches */
+.decl _ActionInEqBranch(if: Insn, br: Insn, call: Insn, action: Function)
+.decl _ActionInNeBranch(if: Insn, br: Insn, call: Insn, action: Function)
+
+/***** Eq *****/
+_ActionInEqBranch(if, br, call, action):-
+	Action(call, action),
+	(IfCodeEqReceiver(if, _, br);
+	IfCodeNeReceiver(if, br, _)),
+	ReachableInBB(br, call).
+
+/* Case (False Positive: Fixed by restrict false branch)
+	apply(){
+		if(code != receiver){
+			action1();
+		}
+		action2(); // reachable from both true/false branch
+	}
+	
+*/ 
+
+// action2 is reachable from true/false branch but not dominated by true head
+_ActionInEqBranch(if, br, call, action):-
+	Action(call, action),
+	(IfCodeEqReceiver(if, _, br);
+	IfCodeNeReceiver(if, br, _)),
+	BasicBlockHead(callHead, call),
+	DominateBB(br, callHead),
+	ReachableBtwBB(br, callHead).
+
+/***** Ne *****/
+_ActionInNeBranch(if, br, call, action):-
+	Action(call, action),
+	(IfCodeEqReceiver(if, br, _);
+	IfCodeNeReceiver(if, _, br)),
+	ReachableInBB(br, call).
+
 
 /* Case (False Positive: Fixed by restrict false branch)
 	apply(){
 		if(code == receiver){
 			action1();
 		}
-		action2(); // reachable from both br1 & br2
+		action2(); // reachable from both true/false branch
 	}
 	
 */ 
 
-.decl _ActionInTrueBranch(if: Insn, br: Insn, call: Insn, action: Function)
-.decl _ActionInFalseBranch(if: Insn, br: Insn, call: Insn, action: Function)
-
-_ActionInTrueBranch(if, br, call, action):-
+// action2 is reachable from true/false branch but not dominated by true head
+_ActionInNeBranch(if, br, call, action):-
 	Action(call, action),
-	IfCodeEqReceiver(if, br, _),
-	ReachableInBB(br, call).
-
-_ActionInTrueBranch(if, br, call, action):-
-	Action(call, action),
-	IfCodeEqReceiver(if, br, _),
-	BasicBlockHead(callHead, call),
-	ReachableBtwBB(br, callHead).
-
-_ActionInFalseBranch(if, br, call, action):-
-	Action(call, action),
-	IfCodeEqReceiver(if, _, br),
-	ReachableInBB(br, call).
-
-// Restrict the false branch from merging back to main branch
-_ActionInFalseBranch(if, br, call, action):-
-	Action(call, action),
-	IfCodeEqReceiver(if, _, br),
+	(IfCodeEqReceiver(if, br, _);
+	IfCodeNeReceiver(if, _, br)),
 	BasicBlockHead(callHead, call),
 	DominateBB(br, callHead),
 	ReachableBtwBB(br, callHead).
 
 
+/***********************
+** Overriden Branches **
+************************/
+
 /* Case (Double Fence: Fixed by checking innermost condition)
 	apply(){
-		if(code == receiver && action == ""){
+		if(code != receiver && action == ""){
 			action();
 		}
 
-		if(code == receiver){
+		if(code != receiver){
 			action();
 		}
 	}
 */
 
-
-.decl OverriddenTrueBranch(br: Insn)
-.decl OverriddenFalseBranch(br: Insn)
+/* The branches that are in top levels and 
+are overriden by the lower level check */
+.decl OverriddenEqBranch(br: Insn)
+.decl OverriddenNeBranch(br: Insn)
 
 
 // The branch dominates other branch means it is overriden
-OverriddenTrueBranch(br):-
-	_ActionInTrueBranch(_, br, _, action),
-	_ActionInFalseBranch(_, br_2, _, action),
+OverriddenEqBranch(br):-
+	_ActionInEqBranch(_, br, _, action),
+	_ActionInNeBranch(_, br_2, _, action),
 	DominateBB(br, br_2).
 
-OverriddenFalseBranch(br):-
-	_ActionInFalseBranch(_, br, _, action),
-	_ActionInTrueBranch(_, br_2, _, action),
+OverriddenNeBranch(br):-
+	_ActionInNeBranch(_, br, _, action),
+	_ActionInEqBranch(_, br_2, _, action),
 	DominateBB(br, br_2).
 
 
+/* actions that are in code == reciever and code != reciever */
+.decl ActionInEqBranch(if: Insn, action: Function)
+.decl ActionInNeBranch(if: Insn, action: Function)
 
-.decl ActionInTrueBranch(if: Insn, action: Function)
-.decl ActionInFalseBranch(if: Insn, action: Function)
+ActionInEqBranch(if, action):-
+	_ActionInEqBranch(if, br, _, action),
+	!OverriddenEqBranch(br).
 
-ActionInTrueBranch(if, action):-
-	_ActionInTrueBranch(if, br, _, action),
-	!OverriddenTrueBranch(br).
+ActionInNeBranch(if, action):-
+	_ActionInNeBranch(if, br, _, action),
+	!OverriddenNeBranch(br).
 
-
-ActionInFalseBranch(if, action):-
-	_ActionInFalseBranch(if, br, _, action),
-	!OverriddenFalseBranch(br).
-
-
+/* violation if action is called in both branches */
 .decl SeperationViolation(action: Function)
 
 SeperationViolation(action):-
-	ActionInTrueBranch(if, action),
-	ActionInFalseBranch(if, action).
+	ActionInEqBranch(if, action),
+	ActionInNeBranch(if, action).
 	

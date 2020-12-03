@@ -1,3 +1,11 @@
+/* 
+Fake Token
+
+Strategy: 
+1. on_notify function 
+2. _code is not checked by either attribute or check()
+*/
+
 #if DEBUG
 	.output PossibleFakeToken
 	.output CheckFakeToken
@@ -5,13 +13,14 @@
 
 .output FakeTokenViolation
 
-
+/* onTransfer actions that are not checked by attribute */
 .decl PossibleFakeToken(func: Function)
 
 PossibleFakeToken(action):-
 	OnTransferAction(call, action),
 	!OnTransferEOSAction(call, action).
 
+/* Mannual check _code */
 .decl CheckFakeToken(insn: Insn)
 
 // Check if _code is used for testing
@@ -22,8 +31,8 @@ CheckFakeToken(insn):-
 	_AssignVar(insn, to, from),
 	pointer.VarPointsTo(from, "_code").
 
-
-
+/* safe action by either calling check directly 
+or calling function with check */
 .decl SafeToken(action: Function)
 
 SafeToken(action):-
@@ -37,6 +46,7 @@ SafeToken(action):-
 	_FuncInsn(func, insn),
 	CheckFakeToken(insn).
 
+/* violation */
 .decl FakeTokenViolation(action: Function)
 FakeTokenViolation(action):-
 	PossibleFakeToken(action),

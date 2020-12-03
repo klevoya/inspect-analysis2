@@ -7,11 +7,13 @@
 		.output InterSrcDomTarget
 	#endif
 
-
+	/* input: srcs and targets in the graph */
 	.decl Src(insn: Insn)
 	.decl Target(insn: Insn)
 
-	/**** Intra procedural ****/
+	/*********************
+	** Intra-procedural **
+	**********************/
 
 	.decl IntraSrcDomTarget(src: Insn, target: Insn)
 	
@@ -51,7 +53,10 @@
 
 
 
-	/**** Inter procedural ****/
+	/*********************
+	** Inter-procedural **
+	**********************/
+
 	.decl InterSrcDomTarget(src: Insn, target: Insn)
 
 	// must analysis
@@ -169,7 +174,20 @@
 		_FuncCall(targetFuncCall, fromFunc, targetFunc),
 		ReachableInBB(srcCall, targetFuncCall).
 		
-	// recursion, can be overlooked for performance
+	// recursion for multiple function calls
+	/* Example:
+		fromFunc(){
+			src;
+			Func1();
+		}
+		Func1(){
+			Func2();
+		}
+		...
+		FuncN(){
+			target;
+		}
+	*/
 	SrcDomFunc(src, targetFunc, targetFuncCall):-
 		SrcDomFunc(src, fromFunc, _),
 		_FuncCall(targetFuncCall, fromFunc, targetFunc).

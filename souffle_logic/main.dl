@@ -1,10 +1,12 @@
-#define DEBUG 1
+// intermediate relations for debug purposes
+#define DEBUG 1 
 #define VERBOSE 1
-#define MayAnalysis 0 // May analysis will report less violation; May ⊆ Must
+
+// May analysis will report less violation; May ⊆ Must
+#define MayAnalysis 0 
 
 #include "control.dl"
 #include "pointer.dl"
-
 .init pointer = Pointer
 
 #include "pre_analysis.dl"

@@ -11,7 +11,6 @@
 		.output LastBB
 		.output NotDominateBB
 	#endif
-
 	.output IfElse
 	.output Merge
 	.output ReachableInBB
@@ -21,7 +20,12 @@
 	.output ReachableBtwBB
 #endif
 
-// Filtered follows without dead path(e.g. follows after br)
+
+/*********************
+** Preprocess input **
+**********************/
+
+/* linear insns: prev -> to */
 .decl Follows(prev: Insn, to: Insn)
 
 Follows(prev, to):-
@@ -30,27 +34,27 @@ Follows(prev, to):-
 	!_BranchTable(prev, _, _).
 
 
-
+/* conditional branching: from -> to */ 
 .decl IfElse(from: Insn, to: Insn)
 
-// cond
+// if/else branching
 IfElse(if, to):-
 	_Branch(if, to, _, _);
 	_Branch(if, _, to, _).
 
-// table
+// table branching
 IfElse(if, to):-
 	_BranchTable(if, to, _).
 
 
-
+/* merging insn */ 
 .decl Merge(merge: Insn)
 
-// uncond
+// uncondtional
 Merge(merge):-
 	_Goto(_, merge).
 
-//cond
+//conditional
 Merge(merge):-
 	_EndIf(_, merge).
 
@@ -59,15 +63,18 @@ Merge(merge):-
 	_BranchTable(_, merge, _).
 
 
-
-// function defintion
+/* function defintion as the entry insn */
 .decl FuncEntry(func: Function, firstInsn: Insn)
 
 FuncEntry(func, insn):-
 	_FormalArgs(insn, func, _, _).
 
 
+/****************
+** Basic Block **
+*****************/
 
+/* Begining of each basic blcok*/
 .decl BasicBlockBegin(begin: Insn)
 
 // begin of function,
@@ -83,7 +90,7 @@ BasicBlockBegin(insn):-
 	Merge(insn).
 
 
-
+/* next insn wihtin the same basic block */
 .decl NextInSameBasicBlock(insn: Insn, next: Insn)
 
 // BB: 1 -> 2 -> 3
@@ -95,8 +102,7 @@ NextInSameBasicBlock(insn, next):-
 	!BasicBlockBegin(next).
 
 
-
-// insn belongs to a basic block with head 
+/* insn belongs to a basic block with head */
 .decl BasicBlockHead(head: Insn, insn: Insn)
 
 // 1, 1
@@ -110,7 +116,7 @@ BasicBlockHead(head, next) :-
    NextInSameBasicBlock(insn, next).
 
 
-
+/* last insn in basic block*/
 .decl BasicBlockEnd(end: Insn)
 
 // 3
@@ -119,10 +125,9 @@ BasicBlockEnd(end):-
 	!NextInSameBasicBlock(end, _).
 
 
-
+/* next basic block: prev -> next*/
 .decl NextBasicBlock(prev: Insn, next: Insn)
 
-// Assuming If/Else is the only the only control transfer in a function
 // Constructing CFG of basic blocks
 // BB1: 1 -> 2(jump BB2)
 // BB2: 3 -> 4
@@ -138,7 +143,7 @@ NextBasicBlock(prevBB, nextBB):-
 	// 2, 3
 	IfElse(prevEnd, nextBB).
 
-// merge point
+// merging point
 // 1 -> 2 -> 5
 // 1 -> 3 -> 5
 NextBasicBlock(prevBB, nextBB):-
@@ -154,7 +159,7 @@ NextBasicBlock(prevBB, nextBB):-
 	_BranchTable(prevEnd, nextBB, _)).
 
 
-
+/* all basic blocks within a function*/
 .decl BBInFunc(insn: Insn, func: Function)
 
 BBInFunc(insn, func):-
@@ -162,7 +167,7 @@ BBInFunc(insn, func):-
 	_FuncInsn(func, insn).
 
 
-
+/* last basic block in a function */
 .decl LastBB(bb: Insn, func: Function)
 
 LastBB(bb, func):-
@@ -170,21 +175,24 @@ LastBB(bb, func):-
 	!NextBasicBlock(bb, _).
 
 
+/**************
+** Dominance **
+***************/
 
-// Dominate relation within function scope 
-/**
+/** Example: 
 	A
 	| \
 	|  B
 	| /
 	C
 
+	Dom:
 	A -> B
 	B -> C
 	A -> C
 **/
 
-
+/* insn2 does not dominate insn1 */
 .decl NotDominateBB(insn1: Insn, insn2: Insn)
 
 // bb does not dominate start
@@ -202,7 +210,7 @@ NotDominateBB(next, bb):-
     next != bb. // for the loop
 
 
-
+/* dom dominates insn */
 .decl DominateBB(dom: Insn, insn: Insn)
 
 // A, B
@@ -214,8 +222,12 @@ DominateBB(dominator, bb):-
 	!NotDominateBB(bb, dominator).
 
 
+/*****************
+** Reachability **
+******************/
 
-// can be restricted to only when in query (e.g. require_auth and dbOps block)
+/* instruction reachability within basic block: insn1 -> ... -> insn2 */
+/* can be restricted to only when in query for performance(e.g. require_auth and dbOps block) */
 .decl ReachableInBB(insn1: Insn, insn2: Insn)
 
 ReachableInBB(insn, insn):-
@@ -225,6 +237,7 @@ ReachableInBB(insn, next):-
 	ReachableInBB(insn, mid),
 	NextInSameBasicBlock(mid, next).
 
+/* basic block reachability: from -> ... -> to */
 .decl ReachableBtwBB(from: Insn, to: Insn)
 
 ReachableBtwBB(from, to):-
