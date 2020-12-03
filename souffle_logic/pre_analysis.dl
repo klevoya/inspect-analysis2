@@ -7,7 +7,7 @@
 	#if VERBOSE
 		.output CheckTransfer
 		.output CheckEOSIO
-		.output DBRemove
+		.output DBFindReachable
 		.output DBUpdateSamePayer
 		.output _DBInsn
 		.output ActionData
@@ -16,6 +16,7 @@
 		.output DBDataAddress2
 		.output DBDataAddress3
 	#endif
+	.output DBRemove
 	.output Action
 	.output ActionParam
 	.output AllActionParam
@@ -244,14 +245,36 @@ DBAction(action):-
 ****************/
 
 /* DB remove insn and its payer */
-.decl DBRemove(insn: Insn, payer: Var)
 
-// Unlikely called without DB find
-// So only consider the find and remove that can be called from the same action
-DBRemove(removeInsn, payer):-
+/* payer of db_remove is obtained from db_find(s) */
+.decl _DBRemove(removeInsn: Insn, findInsn: Insn, payer: Var)
+
+_DBRemove(removeInsn, findInsn, payer):-
 	ActionFuncReachable(action, "db_remove_i64", removeInsn),
 	ActionFuncReachable(action, "db_find_i64", findInsn),
 	_ActualArgs(findInsn, _, 3, payer).
+
+/* for each db_remove insn, db_find_1 can reach to db_find2 */
+.decl DBFindReachable(removeInsn: Insn, findInsn1: Insn, findInsn2: Insn)
+
+DBFindReachable(removeInsn, findInsn1, findInsn2):-
+	_DBRemove(removeInsn, findInsn1, _),
+	_DBRemove(removeInsn, findInsn2, _ ),
+	findInsn1 != findInsn2,
+	//  reachable in BB
+	(ReachableInBB(findInsn1, findInsn2);
+	// reachable btw BB
+	BasicBlockHead(head1, findInsn1),
+	BasicBlockHead(head2, findInsn2),
+	ReachableBtwBB(head1, head2)).
+
+/* select the closest db_find for db_remove */
+.decl DBRemove(insn: Insn, payer: Var)
+
+DBRemove(removeInsn, payer):-
+	_DBRemove(removeInsn, findInsn, payer),
+	!DBFindReachable(removeInsn, findInsn, _).
+
 
 /* DB update on the same payer */
 .decl DBUpdateSamePayer(insn: Insn)
@@ -381,7 +404,7 @@ DBData(insn, var):-
 	_AssignVar(_, storeDynOffset, base).
 
 
-// when there memarg.offset != 0
+// when memarg.offset != 0
 DBData(insn, var):-
 	DBDataAddress3(insn, addressVar),
 	// dynOffset = base
@@ -396,7 +419,7 @@ DBData(insn, var):-
 	to_number(num1) = num2.
 
 
-// when there memarg.offset == 0
+// when memarg.offset == 0
 DBData(insn, var):-
 	DBDataAddress3(insn, addressVar),
 	// addressVar = dynOffset

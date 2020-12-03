@@ -152,7 +152,7 @@ StoreDataAddress(insn, dynOffset, offset, addressVar, n + 1, data):-
 	_AssignVar(_,base, offsetVar),
 	_SimpleAssign(_, offsetVar, num),
 	to_string(storedOffset) = num,
-	n < 3.
+	n < 2.
 	
 
 /* load by calculating offset for stored address */
