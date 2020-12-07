@@ -11,6 +11,10 @@ Three layers:
 	Flow-sensitive: check if require_auth dominate the function call with the correpsonding payer varaible (ordered matching)
 */
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	#if VERBOSE
 		.output SafeDBOps
@@ -24,6 +28,7 @@ Three layers:
 
 .output AuthViolation
 
+/************/
 
 /* violation DBinsn and its actions */
 .decl AuthViolation(action: Function, insn: Insn)

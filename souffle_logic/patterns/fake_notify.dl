@@ -6,12 +6,17 @@ Strategy:
 2. first/second parameter is not checked with _self
 */
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	.output CheckFakeNotify
 #endif
 
 .output FakeNotifyViolation
 
+/************/
 
 /* safe actions with checking statment */
 .decl CheckFakeNotify(action: Function, insn: Insn)

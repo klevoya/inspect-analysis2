@@ -18,6 +18,7 @@
 #include "patterns/fake_notify.dl"
 #include "patterns/seperation.dl"
 #include "patterns/overflow.dl"
+#include "patterns/unbounded.dl"
 
 
 // Final Results for test suite
@@ -41,3 +42,6 @@ Result("Seperation", num):-
 
 Result("Overflow", num):-
 	num = count : OverflowViolation(_, _).
+
+Result("Unbounded", num):-
+    num = count : UnboundedViolation(_, _).

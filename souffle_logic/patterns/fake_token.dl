@@ -6,12 +6,19 @@ Strategy:
 2. _code is not checked by either attribute or check()
 */
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	.output PossibleFakeToken
 	.output CheckFakeToken
 #endif
 
 .output FakeTokenViolation
+
+/************/
+
 
 /* onTransfer actions that are not checked by attribute */
 .decl PossibleFakeToken(func: Function)

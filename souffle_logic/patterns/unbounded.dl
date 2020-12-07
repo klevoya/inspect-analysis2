@@ -1,0 +1,49 @@
+/* 
+Unbounded Iterator
+
+Strategy: 
+1. Locate loop with iterator as condition
+2. Doesn't exist any other exit conditions
+*/
+
+/***********
+** Output **
+************/
+
+#if DEBUG
+    .output IteratorLoop
+    .output InlineContract
+#endif
+
+.output UnboundedViolation
+
+/************/
+
+/* loops with iterator as exit condition */
+.decl IteratorLoop(loop:Insn, break: Insn)
+
+IteratorLoop(loop, break):-
+    BBInLoop(loop, bb),
+    BasicBlockHead(bb, break),
+    _Branch(break, _, _, cond),
+    _AssignVar(_, cond, itr),
+    _ActualReturn(_, "db_next_i64",itr),
+    _AssignVar(_, cond, const),
+    _SimpleAssign(_, const, "0").
+
+/* Safe loop if it has other exit conditions */
+.decl SafeIterator(loop: Insn)
+
+SafeIterator(loop):-
+    IteratorLoop(loop, break),
+    ExitLoop(loop, exit),
+    exit != break.
+
+/* The unsafe ones */
+.decl UnboundedViolation(action: Function, loop: Insn)
+
+UnboundedViolation(action, loop):-
+    IteratorLoop(loop, _),
+    !SafeIterator(loop),
+    _FuncInsn(function,loop),
+    ActionFuncReachable(action, function, _).

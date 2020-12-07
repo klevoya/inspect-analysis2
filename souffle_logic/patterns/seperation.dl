@@ -9,6 +9,10 @@ Issue:
 1. May suffer from same body functions due to compiler optimisation
 */
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	.output CodeEqReceiverVar
 	.output CodeNeReceiverVar
@@ -26,6 +30,8 @@ Issue:
 #endif
 
 .output SeperationViolation
+
+/************/
 
 /*************
 ** Booleans **

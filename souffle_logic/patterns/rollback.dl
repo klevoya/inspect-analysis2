@@ -7,12 +7,18 @@ Strategy:
 */
 
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	.output DBRollback
 	.output InlineContract
 #endif
 
 .output RollbackViolation
+
+/************/
 
 /* Rollback in actions with DBOps */
 .decl DBRollback(sendInsn: Insn, contract: Var)

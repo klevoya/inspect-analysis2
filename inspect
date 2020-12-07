@@ -84,6 +84,7 @@ print_result("FakeTokenViolation.csv")
 print_result("FakeNotifyViolation.csv")
 print_result("SeperationViolation.csv")
 print_result("OverflowViolation.csv")
+print_result("UnboundedViolation.csv")
 
 run_time = time.time() - start_time
 run_time_m = str(int(run_time // 60)) + "m "if run_time // 60 > 0 else ""

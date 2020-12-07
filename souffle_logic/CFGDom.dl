@@ -1,11 +1,17 @@
 .comp CFGDom{
 
+	/***********
+	** Output **
+	************/
+
 	#if DEBUG & VERBOSE
 		.output SrcDomFunc
 		.output MustSrcInFunc
 		.output IntraSrcDomTarget
 		.output InterSrcDomTarget
 	#endif
+	
+	/************/
 
 	/* input: srcs and targets in the graph */
 	.decl Src(insn: Insn)

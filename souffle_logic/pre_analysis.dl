@@ -3,6 +3,10 @@
 ** e.g. Actions, DBInsn etc **
 ******************************/
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	#if VERBOSE
 		.output CheckTransfer
@@ -30,6 +34,9 @@
 #endif
 
 .output ActionCondition
+
+/************/
+
 
 /***********
 ** Action **

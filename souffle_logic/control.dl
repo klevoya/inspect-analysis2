@@ -1,6 +1,10 @@
 #include "input.dl"
 #include "CFGDom.dl"
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	#if VERBOSE
 		.output FuncEntry
@@ -18,8 +22,12 @@
 	.output NextInSameBasicBlock
 	.output DominateBB
 	.output ReachableBtwBB
+	.output Loop
+	.output BBInLoop
+	.output ExitLoop
 #endif
 
+/************/
 
 /*********************
 ** Preprocess input **
@@ -247,5 +255,33 @@ ReachableBtwBB(from, to):-
 	ReachableBtwBB(from, mid),
 	ReachableBtwBB(mid, to).
 
+/**********
+** Loops **
+***********/
+
+/* loops is predetermined in decompiler */
+.decl Loop(begin: Insn, end: Insn)
+
+Loop(begin, endHead):-
+	_Goto(end, begin),
+	BasicBlockHead(endHead, end),
+	contains("(loop)", begin).
+
+/* all basic blocks in loop */
+.decl BBInLoop(loop:Insn, bb: Insn)
+
+BBInLoop(loop, bb):-
+	Loop(loop, end),
+	ReachableBtwBB(loop, bb),
+	ReachableBtwBB(bb, end).
+
+/* the exit insn of a loop */
+.decl ExitLoop(loop: Insn, break: Insn)
+
+ExitLoop(loop, break):-
+	BBInLoop(loop, bb),
+	BasicBlockHead(bb, break),
+	_Branch(break, _, outside, _),
+	!BBInLoop(loop, outside).
 
 
