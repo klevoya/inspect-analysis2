@@ -129,6 +129,18 @@
 	FirstLoadData(insn, var, "_self"):-
 		_ActualReturn(insn, "current_receiver", var).
 
+	// other variable that can be stored directly
+	/*  Problems: 
+		1. Performance bottleneck, comment out for faster execution
+		2. Includes address storage as well, which should only be in StoreDataAddress
+	*/
+	// FirstLoadData(insn, to, root):-
+	// 	_AssignVar(insn, to, _),
+	// 	_Store(insn, _, _, to), 
+	// 	// !StoreDataAddress(insn, _, _, _, _, _),
+	// 	_VarPointsTo(to, root),
+	// 	RootVar(root).
+
 
 	/* store data directly */
 	.decl StoreData(insn: Insn, address: Var, offset: number, var: Var)
@@ -158,7 +170,7 @@
 		_AssignVar(_,base, offsetVar),
 		_SimpleAssign(_, offsetVar, num),
 		to_string(storedOffset) = num,
-		n < 3.
+		n < 2.
 		
 
 	/* load by calculating offset for stored address */

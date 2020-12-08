@@ -22,6 +22,8 @@ Strategy:
 /* loops with iterator as exit condition */
 .decl IteratorLoop(loop:Insn, break: Insn)
 
+// itr = db_next_i64()
+// if(itr < 0)
 IteratorLoop(loop, break):-
     BBInLoop(loop, bb),
     BasicBlockHead(bb, break),
