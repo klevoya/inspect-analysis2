@@ -75,9 +75,15 @@ def print_result(violation_file):
 			print(rest)
 	print()
 
+def print_action_name(action_name):
+    for func in action_name:
+        print(func, "->", action_name[func])
+    print()
+
+print("Action Names:")
+print_action_name(action_name)
+
 print(bold("Analysis Result\n"))
-# print("Action Names:")
-# print(action_name, end="\n\n")
 print_result("AuthViolation.csv")
 print_result("RollbackViolation.csv")
 print_result("FakeTokenViolation.csv")

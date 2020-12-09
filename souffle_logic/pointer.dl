@@ -132,29 +132,32 @@
 	// other variable that can be stored directly
 	/*  Problems: 
 		1. Performance bottleneck, comment out for faster execution
-		2. Includes address storage as well, which should only be in StoreDataAddress
+		2. Includes address storage as well, which should only be in StoreDataAddress. 
+		Hard to solve because of double negation
 	*/
 	// FirstLoadData(insn, to, root):-
-	// 	_AssignVar(insn, to, _),
 	// 	_Store(insn, _, _, to), 
 	// 	// !StoreDataAddress(insn, _, _, _, _, _),
-	// 	_VarPointsTo(to, root),
-	// 	RootVar(root).
+	// 	_VarPointsTo(to, root).
 
 
 	/* store data directly */
-	.decl StoreData(insn: Insn, address: Var, offset: number, var: Var)
+	.decl StoreData(insn: Insn, dynOffset: Var, offset: number, var: Var)
 
 	StoreData(insn, address, offset, to):-
 		_VarPointsTo(var, to),
-		FirstLoadData(_, _, to),
-		_Store(insn, addressVar, offset, var), 
-		_AssignVar(_, addressVar, address).
+		LoadData(_, _, to),
+		_Store(insn, dynOffsetVar, offset, var), 
+		_AssignVar(_, dynOffsetVar, dynOffset).
 
 
 	/* store the address that can point to data */
 	.decl StoreDataAddress (insn: Insn, dynOffset: Var, offset: number, addressVar: Var, index: number, data: Var)
 
+	// store(storedDynOffset_1 + storedOffset) = data
+	// ...
+	// addressVar = storedDynOffset_2 + offsetVar
+	// store(dynOffset + offset) = addressVar
 	StoreDataAddress(insn, dynOffset, offset, addressVar, n + 1, data):-
 		// the store statement for dynOffset
 		_Store(insn, dynOffset, offset, addressVar), 
@@ -172,6 +175,16 @@
 		to_string(storedOffset) = num,
 		n < 2.
 		
+	// TODO: Add memcpy 
+	// StoreData(insn, address, newOffset, data):-
+	// 	_Memcpy(insn, to, from, _),
+	// 	StoreData(_, storedDynOffset, storedOffset_1, data),
+	// 	_VarPointsTo(from, dynOffsetVar),
+
+	// 	_VarPointsTo(from, offsetVar),
+	// 	_SimpleAssign(_, offsetVar, storedOffset_2),
+	// 	storedOffset_1 = to_number(storedOffset_2),
+
 
 	/* load by calculating offset for stored address */
 	.decl LoadDataAddress(insn: Insn, to: Var, storedAddress: Var, index: number, data: Var)
@@ -210,9 +223,9 @@
 		_VarPointsTo(loadDynOffset, address).
 
 
-	// store(storeDynOffset + storeOffset) = from
+	// Store(storeDynOffset + storeOffset) = from
 	// loadAddressVar = loadDynOffset + loadOffsetVar
-	// to = load(loadAddressVar + loadOffset) 
+	// to = Load(loadAddressVar + loadOffset) 
 	// ---> loadOffsetVar + loadOffset = storeOffset
 
 	// load data by computing the offset 
@@ -256,6 +269,13 @@
 	InterCopyAssign(to, from):-
 		_Load(_, from, _, to),
 		!_InterCopyAssign(to, _).
+
+	// for the other vars, copy the data to the root var
+	InterCopyAssign(var, from):-
+		_Store(insn, to, _, from),
+		_VarPointsTo(to, var),
+		!StoreData(insn, _, _, _),
+		!StoreDataAddress(insn, _, _, _, _, _).
 
 	// inherit the v1 relation
 	InterCopyAssign(to, from):-
