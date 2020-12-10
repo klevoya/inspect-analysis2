@@ -1,3 +1,4 @@
+ActionCondition
 /*****************************
 ** EOS related pre-analysis **
 ** e.g. Actions, DBInsn etc **
@@ -237,7 +238,8 @@ ActionCondition(action, constant):-
 	BasicBlockHead(toBranch, call),
 	_SimpleAssign(_, constVar, constant),
 	_AssignVar(_, ifVar, constVar),
-	_Branch(_, _, toBranch, ifVar).
+	(_Branch(_, _, toBranch, ifVar);
+    _Branch(_, toBranch, _, ifVar)).
 
 /* actions that contains dbOps */
 .decl DBAction(action: Function)

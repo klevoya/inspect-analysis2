@@ -144,7 +144,7 @@
 	/* store data directly */
 	.decl StoreData(insn: Insn, dynOffset: Var, offset: number, var: Var)
 
-	StoreData(insn, address, offset, to):-
+	StoreData(insn, dynOffset, offset, to):-
 		_VarPointsTo(var, to),
 		LoadData(_, _, to),
 		_Store(insn, dynOffsetVar, offset, var), 
