@@ -115,6 +115,24 @@
 		offset = to_number(offsetSymbol),
 		AllActionParam(action, index, name).
 
+	//iterator: Some does not work
+	// .decl Iterator(insn: Insn, var: Var, to: Var)
+	// .output Iterator 
+	// Iterator(insn, var, var):-
+	// 	_ActualReturn(insn, "db_find_i64", var);
+	// 	_ActualReturn(insn, "db_lowerbound_i64", var);
+	// 	_ActualReturn(insn, "db_end_i64", var).
+
+
+	// Iterator(insn, to, from):-
+	// 	_ActualReturn(prevInsn, "db_previous_i64", to),
+	// 	_ActualArgs(prevInsn, _, 0, itr),
+	// 	_VarPointsTo(itr, from),
+	// 	Iterator(insn, _, from).
+
+	// FirstLoadData(insn, to, from):-
+	// 	Iterator(insn, to, from).
+
 	// _self and _code techniquecally are not loaded, 
 	// but included in this realtion for convenience.
 

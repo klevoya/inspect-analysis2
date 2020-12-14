@@ -27,7 +27,7 @@
 .output Result
 
 Result("Auth", num):-
-	num = count : AuthViolation(_, _).
+	num = count : AuthViolation(_, _, _).
 
 Result("Rollback", num):-
 	num = count : RollbackViolation(_, _).
