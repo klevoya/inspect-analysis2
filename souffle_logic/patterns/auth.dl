@@ -31,6 +31,7 @@ Three layers:
 /************/
 
 /* violation DBinsn and its actions */
+.decl _AuthViolation(action: Function, insn: Insn)
 .decl AuthViolation(action: Function, insn: Insn, table: symbol)
 
 /* require_auth dom DBOps wihtin CFG */
@@ -40,7 +41,7 @@ auth_dom_db.Src(check):-
 	_FuncCall(check, _, "require_auth").
 
 auth_dom_db.Target(target):-
-	DBInsn(target, _, _).
+	DBInsn(target, _).
 
 
 
@@ -55,7 +56,7 @@ auth_dom_db.Target(target):-
 SafeDBOps(dbInsn):-
 	auth_dom_db.IntraSrcDomTarget(check, dbInsn),
 	_ActualArgs(check, "require_auth", 0, authVar),
-	DBInsn(dbInsn, _, payerVar),
+	DBInsn(dbInsn, payerVar),
 	pointer.VarPointsTo(authVar, user),
 	pointer.VarPointsTo(payerVar, user).
 
@@ -71,7 +72,7 @@ SafeDBOps(dbInsn):-
 .decl PossibleAuthViolation(insn: Insn)
 
 PossibleAuthViolation(insn):-
-	DBInsn(insn, _, _),
+	DBInsn(insn, _),
 	!SafeDBOps(insn).
 
 
@@ -113,7 +114,7 @@ AuthorisedPayerForDB(check, payer, dbInsn):-
 SafeDBOpsInAction(action, dbInsn):-
 	PossibleAuthViolation(dbInsn),
 	AuthorisedPayerForDB(authInsn, to, dbInsn),
-	DBInsn(dbInsn, _, payer),
+	DBInsn(dbInsn, payer),
 	pointer.VarPointsTo(payer, to),
 	ActionFuncReachable(action, _, authInsn),
 	ActionFuncReachable(action, _, dbInsn).
@@ -133,12 +134,12 @@ SafeDBOpsInAction(action, dbInsn):-
 */
 
 // If miss any payer authorisation 
-AuthViolation(action, dbInsn, table):-
+_AuthViolation(action, dbInsn):-
 	PossibleAuthViolation(dbInsn),
-	DBInsn(dbInsn, table, _),
+	DBInsn(dbInsn, _),
 	!AuthorisedPayerForDB(_, to, dbInsn),
 	!SafeDBOpsInAction(action, dbInsn),
-	DBInsn(dbInsn, _, payer),
+	DBInsn(dbInsn, payer),
 	pointer.VarPointsTo(payer, to),
 	ActionFuncReachable(action, _, dbInsn).
 
@@ -169,7 +170,7 @@ if it's passed by parameter */
 PayerInFunc(dbInsn, payerVar, func):-
 	PossibleAuthViolation(dbInsn),
 	_FuncInsn(func, dbInsn),
-	DBInsn(dbInsn, _, payerVar).
+	DBInsn(dbInsn, payerVar).
 
 // All the payer var within the function
 PayerInFunc(dbInsn, to, func):-
@@ -185,13 +186,22 @@ PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	_ActualArgs(funcCall, func, index, actualVar),
 	pointer.VarPointsTo(actualVar, to).
 
-/* For mixed order require_auth and DBOps function call */
-AuthViolation(action, dbInsn, table):-
+/* for mixed order require_auth and DBOps function call */
+_AuthViolation(action, dbInsn):-
 	PayerInFuncCallPointsTo(dbInsn, to, funcCall),
-	DBInsn(dbInsn, table, _),
+	DBInsn(dbInsn, _),
 	!auth_dom_db.SrcDomFunc(check, _, funcCall),
 	_ActualArgs(check, "require_auth", 0, authVar),
 	pointer.VarPointsTo(authVar, to),
 	ActionFuncReachable(action, _, dbInsn).
 
+/* add table reference */
+AuthViolation(action, dbInsn, table):-
+	_AuthViolation(action, dbInsn),
+	TableReference(dbInsn, table).
+
+/* add table reference */
+AuthViolation(action, dbInsn, "Unkown Table"):-
+	_AuthViolation(action, dbInsn),
+	!TableReference(dbInsn, _).
 

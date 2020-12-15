@@ -11,7 +11,7 @@
 	#if VERBOSE
 		.output CheckTransfer
 		.output CheckEOSIO
-		.output _DBFind
+		.output DBFind
 		.output DBFindReachable
 		.output DBUpdateSamePayer
 		.output _DBInsn
@@ -36,6 +36,7 @@
 #endif
 
 .output ActionCondition
+.output TableReference
 
 /************/
 
@@ -246,7 +247,7 @@ ActionCondition(action, constant):-
 .decl DBAction(action: Function)
 
 DBAction(action):-
-	DBInsn(dbInsn, _, _),
+	DBInsn(dbInsn, _),
 	ActionFuncReachable(action, _, dbInsn).
 
 
@@ -257,22 +258,22 @@ DBAction(action):-
 /* DB remove/update insn and its db_find insn */
 
 /* payer/table of db_remove/db_update is obtained from db_find(s) */
-.decl _DBFind(dbInsn: Insn, findInsn: Insn)
+.decl DBFind(dbInsn: Insn, findInsn: Insn)
 
-// _DBRemove(removeInsn, findInsn, payer):-
-// 	__DBRemove(removeInsn, itr),
-// 	pointer.VarPointsTo(itr, findVar),
-// 	_ActualReturn(findInsn, "db_find_i64", findVar),
-// 	_ActualArgs(findInsn, _, 3, payer).
+// DBFind(dbInsn, findInsn):-
+// 	(ActionFuncReachable(action, "db_remove_i64", dbInsn);
+// 	ActionFuncReachable(action, "db_update_i64", dbInsn)),
+// 	ActionFuncReachable(action, find_func, findInsn),
+// 	(find_func = "db_find_i64";
+// 	find_func = "db_lowerbound_i64";
+// 	find_func = "db_upperbound_i64";
+// 	find_func = "db_end_i64").
 
-_DBFind(dbInsn, findInsn):-
-	(ActionFuncReachable(action, "db_remove_i64", dbInsn);
-	ActionFuncReachable(action, "db_update_i64", dbInsn)),
-	ActionFuncReachable(action, find_func, findInsn),
-	(find_func = "db_find_i64";
-	find_func = "db_lowerbound_i64";
-	find_func = "db_upperbound_i64";
-	find_func = "db_end_i64").
+DBFind(dbInsn, findInsn):-
+	(_DBUpdate(dbInsn, itr, _, _);
+	_DBRemove(dbInsn, itr)),
+	pointer.VarPointsTo(itr, to),
+	_ActualReturn(findInsn, _, to).
 
 
 /** In case there are two db_find for the same dbInsn,
@@ -282,8 +283,8 @@ choose the closest one, see no_auth_remove2 **/
 .decl DBFindReachable(dbInsn: Insn, findInsn1: Insn, findInsn2: Insn)
 
 DBFindReachable(dbInsn, findInsn1, findInsn2):-
-	_DBFind(dbInsn, findInsn1),
-	_DBFind(dbInsn, findInsn2),
+	DBFind(dbInsn, findInsn1),
+	DBFind(dbInsn, findInsn2),
 	findInsn1 != findInsn2,
 	//  reachable in BB
 	(ReachableInBB(findInsn1, findInsn2);
@@ -297,7 +298,7 @@ DBFindReachable(dbInsn, findInsn1, findInsn2):-
 
 DBRemove(removeInsn, tableVar, payer):-
 	_DBRemove(removeInsn, _),
-	_DBFind(removeInsn, findInsn),
+	DBFind(removeInsn, findInsn),
 	_ActualArgs(findInsn, _, 2, tableVar),
 	_ActualArgs(findInsn, _, 3, payer),
 	// cannot reach to another find insn 
@@ -308,7 +309,7 @@ DBRemove(removeInsn, tableVar, payer):-
 
 DBUpdate(updateInsn, tableVar, payer):-
 	_DBUpdate(updateInsn, _, payer, _),
-	_DBFind(updateInsn, findInsn),
+	DBFind(updateInsn, findInsn),
 	_ActualArgs(findInsn, _, 2, tableVar),
 	// cannot reach to another find insn 
 	!DBFindReachable(updateInsn, findInsn, _).
@@ -323,37 +324,40 @@ DBUpdateSamePayer(insn):-
 	pointer.VarPointsTo(payer, var),
 	_SimpleAssign(_, var, "0").
 
-/* all DBOps and their payer variables*/
-.decl _DBInsn(insn: Insn, table: symbol, payer: Var)
 
-// _DBInsn(insn, payer):-
-// 	_DBStore(insn, table, _, payer, _, _);
-// 	_DBUpdate(insn, _, payer, _);
-// 	DBRemove(insn, payer).
+.decl TableReference(insn: Insn, table: symbol)
 
-_DBInsn(insn, table, payer):-
-	(_DBStore(insn, _, tableVar, payer, _, _);
-	DBRemove(insn, tableVar, payer);
-	DBUpdate(insn, tableVar, payer)),
+TableReference(insn, table):-
+	(_DBStore(insn, _, tableVar, _, _, _);
+	DBRemove(insn, tableVar, _);
+	DBUpdate(insn, tableVar, _)),
 	_SimpleAssign(_, tableVar, table).
+
+/* all DBOps and their payer variables*/
+.decl _DBInsn(insn: Insn, payer: Var)
+
+_DBInsn(insn, payer):-
+	_DBStore(insn, _, _, payer, _, _);
+	_DBUpdate(insn, _, payer, _);
+	DBRemove(insn, _, payer).
 
 /* if payers are _self or _code for easier debug process,
    and remove other pointed vars to eliminate false positive */
-.decl DBInsn(insn: Insn, table: symbol, payer: Var)
+.decl DBInsn(insn: Insn, payer: Var)
 
 // if payer is _self
-DBInsn(insn, table, "_self"):-
-	_DBInsn(insn, table, payer),
+DBInsn(insn, "_self"):-
+	_DBInsn(insn, payer),
 	pointer.VarPointsTo(payer,"_self").
 
 // if payer is _code
-DBInsn(insn, table, "_code"):-
-	_DBInsn(insn, table, payer),
+DBInsn(insn, "_code"):-
+	_DBInsn(insn, payer),
 	pointer.VarPointsTo(payer,"_code").
 
 // else keep the same payer var
-DBInsn(insn, table, payer):-
-	_DBInsn(insn, table, payer),
+DBInsn(insn, payer):-
+	_DBInsn(insn, payer),
 	!pointer.VarPointsTo(payer,"_code"),
 	!pointer.VarPointsTo(payer,"_self").
 

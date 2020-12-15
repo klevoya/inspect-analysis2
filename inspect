@@ -9,7 +9,11 @@ def string_from_long(action):
     charmap = ['.','1','2','3','4','5','a','b','c','d','e','f','g','h','i',
                 'j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z']
     str = [None] * 13
-    tmp = int(action)
+    try:
+    	tmp = int(action)
+    except ValueError:
+    	return action
+    	
     for i in range(13):
         c = charmap[int(tmp & (0x0f if i == 0 else 0x1f))]
         str[12-i] = c

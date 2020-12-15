@@ -115,23 +115,61 @@
 		offset = to_number(offsetSymbol),
 		AllActionParam(action, index, name).
 
-	//iterator: Some does not work
-	// .decl Iterator(insn: Insn, var: Var, to: Var)
-	// .output Iterator 
-	// Iterator(insn, var, var):-
-	// 	_ActualReturn(insn, "db_find_i64", var);
-	// 	_ActualReturn(insn, "db_lowerbound_i64", var);
-	// 	_ActualReturn(insn, "db_end_i64", var).
+	//iterator
+	.decl Iterator(insn: Insn, var: Var, to: Var)
+	.output Iterator 
+	Iterator(insn, var, var):-
+		_ActualReturn(insn, "db_find_i64", var);
+		_ActualReturn(insn, "db_lowerbound_i64", var);
+		_ActualReturn(insn, "db_end_i64", var).
 
 
-	// Iterator(insn, to, from):-
-	// 	_ActualReturn(prevInsn, "db_previous_i64", to),
-	// 	_ActualArgs(prevInsn, _, 0, itr),
-	// 	_VarPointsTo(itr, from),
-	// 	Iterator(insn, _, from).
+	// take iterator and return an iterator
+	// itr_1 = db_next_i64(itr_2, ...)
+	Iterator(insn, to, from):-
+		(_ActualReturn(prevInsn, "db_previous_i64", to);
+		_ActualReturn(prevInsn, "db_next_i64", to)),
+		_ActualArgs(prevInsn, _, 0, itr),
+		_VarPointsTo(itr, from),
+		Iterator(insn, _, from).
 
-	// FirstLoadData(insn, to, from):-
-	// 	Iterator(insn, to, from).
+	FirstLoadData(insn, to, from):-
+		Iterator(insn, to, from).
+
+	.decl StoreDataDynOffset(insn: Insn, dynOffset: Var, offset: number, toStoreDynOffset: Var, data: Var)
+	.output StoreDataDynOffset
+
+	// storedDynOffset = base
+	// store(storedDynOffset + storedOffset) = data
+	// ...
+	// toStoreDynOffset = base
+	// store(dynOffset + offset) = toStoreDynOffset
+
+	StoreDataDynOffset(insn, dynOffset, offset, toStoreDynOffset, data):-
+		_Store(insn, dynOffset, offset, toStoreDynOffset),
+		StoreData(_, storedDynOffset, _, data),
+		_VarPointsTo(toStoreDynOffset, base),
+		_VarPointsTo(storedDynOffset, base).
+
+
+	.decl LoadDataDynOffset(insn: Insn, to: Var, storedDynOffset: Var, data: Var)
+	.output LoadDataDynOffset
+
+	_VarPointsTo(to, vars),
+	LoadDataDynOffset(insn, to, storedDynOffset, data):-
+		StoreDataDynOffset(_, storeDynOffset_1, storeOffset, storedDynOffset, data),
+		_Load(insn, loadDynOffset, loadOffset, to),
+		_VarPointsTo(storeDynOffset_1, base),
+		// base <- dynOffset
+		_AssignVar(_, base, storeDynOffset_2),
+		_VarPointsTo(storeDynOffset_2, root),
+		_VarPointsTo(loadDynOffset, root),
+		// base <- storeOffsetVar
+		_AssignVar(_, base, storeOffsetVar),
+		_SimpleAssign(_, storeOffsetVar, num),
+		loadOffset = to_number(num) + storeOffset,
+		_VarPointsTo(storedDynOffset, vars).
+
 
 	// _self and _code techniquecally are not loaded, 
 	// but included in this realtion for convenience.

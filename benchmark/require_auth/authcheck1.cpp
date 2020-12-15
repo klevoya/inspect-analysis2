@@ -22,7 +22,7 @@ public:
   users_t _users;
 
   ACTION updatemiss(name username, const std::string &display_name) {
-    auto itr = _users.begin();
+    auto itr = --_users.end();
     _users.modify(itr, eosio::same_payer, [&](auto &new_user) {
       new_user.username = username;
       new_user.display_name = display_name;
