@@ -260,20 +260,28 @@ DBAction(action):-
 /* payer/table of db_remove/db_update is obtained from db_find(s) */
 .decl DBFind(dbInsn: Insn, findInsn: Insn)
 
-// DBFind(dbInsn, findInsn):-
-// 	(ActionFuncReachable(action, "db_remove_i64", dbInsn);
-// 	ActionFuncReachable(action, "db_update_i64", dbInsn)),
-// 	ActionFuncReachable(action, find_func, findInsn),
-// 	(find_func = "db_find_i64";
-// 	find_func = "db_lowerbound_i64";
-// 	find_func = "db_upperbound_i64";
-// 	find_func = "db_end_i64").
+#if Iterator 
 
 DBFind(dbInsn, findInsn):-
 	(_DBUpdate(dbInsn, itr, _, _);
 	_DBRemove(dbInsn, itr)),
+	// to -> itr
 	pointer.VarPointsTo(itr, to),
+	// itr = db_find(...)
 	_ActualReturn(findInsn, _, to).
+
+#else
+
+DBFind(dbInsn, findInsn):-
+	(ActionFuncReachable(action, "db_remove_i64", dbInsn);
+	ActionFuncReachable(action, "db_update_i64", dbInsn)),
+	ActionFuncReachable(action, find_func, findInsn),
+	(find_func = "db_find_i64";
+	find_func = "db_lowerbound_i64";
+	find_func = "db_upperbound_i64";
+	find_func = "db_end_i64").
+
+#endif
 
 
 /** In case there are two db_find for the same dbInsn,
@@ -282,6 +290,18 @@ choose the closest one, see no_auth_remove2 **/
 /* for each db_remove/db_update insn, db_find_1 can reach to db_find2 */
 .decl DBFindReachable(dbInsn: Insn, findInsn1: Insn, findInsn2: Insn)
 
+// Works
+// db_find_1 => br1 | br2
+// br1 => db_find_2
+
+// Not Works
+// ... => br1 | br2
+// br1 => db_find_1
+// br2 => db_find_2
+// br1 | br2 => db_remove
+
+// db_find_1 -> db_find_2 (linear)
+// db_find_2 => db_remove
 DBFindReachable(dbInsn, findInsn1, findInsn2):-
 	DBFind(dbInsn, findInsn1),
 	DBFind(dbInsn, findInsn2),
@@ -348,12 +368,12 @@ _DBInsn(insn, payer):-
 // if payer is _self
 DBInsn(insn, "_self"):-
 	_DBInsn(insn, payer),
-	pointer.VarPointsTo(payer,"_self").
+	pointer.VarPointsTo(payer, "_self").
 
 // if payer is _code
 DBInsn(insn, "_code"):-
 	_DBInsn(insn, payer),
-	pointer.VarPointsTo(payer,"_code").
+	pointer.VarPointsTo(payer, "_code").
 
 // else keep the same payer var
 DBInsn(insn, payer):-
@@ -366,8 +386,9 @@ DBInsn(insn, payer):-
 ** DB Payload **
 ****************/
 
-// Example
+// Example_1 (unsafe_store2.wasm | code may change due to decompiler update)
 /*
+$um = $ue
 store(dyn_offset = $um + memarg.offset: 8) = $up
 
 ....
@@ -391,7 +412,7 @@ $vq = $vo + $vp
 // Done via either memcpy or store the address that stores the data
 
 // The one used for dbOps
-// address with offset
+// address with offset (dynOffset: $vq, offset: 16)
 .decl _DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
 
 _DBDataAddress(insn, dynOffset, offset):-
@@ -405,7 +426,7 @@ _DBDataAddress(insn, dynOffset, offset):-
 
 
 // The one that used for memcpy
-// when the address is form of x = y + z
+// The copied memoery in memcpy (dynOffset: $ut)
 .decl DBDataAddress1(insn: Insn, dynOffset: Var)
 
 DBDataAddress1(insn, from):-
@@ -418,8 +439,27 @@ DBDataAddress1(insn, from):-
 	_AssignVar(_, dynOffset2, base).
 
 
-// when address is the form of x = y
-.decl DBDataAddress2(insn: Insn, dynOffset: Var)
+/**
+Example_2 (unsafe_db.wasm):
+
+$bka = $bjf (get_local[1])
+store(dyn_offset = $bka + memarg.offset: 8) = $bkg
+
+...
+
+$bkp = $bko (get_local[3])
+$bkq = $bjf (get_local[1])
+$bkr = 8
+($bks) = memcpy($bkp, $bkq, $bkr)
+
+...
+
+$ble = $bko (get_local[3])
+() = db_update_i64($blc, $bld, $ble, $blf)
+**/
+
+// when address is the form of x = y (address: $bkq)
+.decl DBDataAddress2(insn: Insn, address: Var)
 
 DBDataAddress2(insn, from):-
 	(_DBUpdate(insn, _, _, address);
@@ -430,19 +470,7 @@ DBDataAddress2(insn, from):-
 	_MemCopy(_, to, from, _).
 
 
-// when address is used directly to store data address
-.decl DBDataAddress3(insn: Insn, var: Var)
-
-DBDataAddress3(insn, var):-
-	(_DBUpdate(insn, _, _, address);
-	_DBStore(insn, _, _, _, _, address)),
-	_AssignType(_, address, "Copy"),
-	_AssignVar(_, address, base),
-	_Store(_, storeDynOffset, _, var),
-	_AssignVar(_, storeDynOffset, base).
-
-
-// The actual data
+// The actual data (var: $up in ex_1 and $bkg in ex_2)
 .decl DBData(insn: Insn, var: Var)
 
 DBData(insn, var):-
@@ -452,8 +480,38 @@ DBData(insn, var):-
 	_AssignVar(_, dynOffset, base),
 	_AssignVar(_, storeDynOffset, base).
 
+/** Example_3(unsafe_store.wasm)
 
-// when memarg.offset != 0
+$xh = $wt
+store(dyn_offset = $xh + memarg.offset: 16) = $xm
+
+...
+
+$yf = $wk (get_local[4])
+$yg = $wt (get_local[5])
+$yh = 16
+$yi = $yg + $yh
+store(dyn_offset = $yf + memarg.offset: 56) = $yi
+
+...
+
+$yx = $wk (get_local[4])
+($yz) = db_store_i64($yr, $ys, $yt, $yv, $yx, $yy)
+**/
+
+// when address is used directly to store data address 
+.decl DBDataAddress3(insn: Insn, var: Var)
+
+// regardless of the memarg offset, as it could be an array of data (var: $yi)
+DBDataAddress3(insn, var):-
+	(_DBUpdate(insn, _, _, address);
+	_DBStore(insn, _, _, _, _, address)),
+	_AssignType(_, address, "Copy"),
+	_AssignVar(_, address, base),
+	_Store(_, storeDynOffset, _, var),
+	_AssignVar(_, storeDynOffset, base).
+
+// when memarg.offset != 0 (var: $xm in ex_3)
 DBData(insn, var):-
 	DBDataAddress3(insn, addressVar),
 	// dynOffset = base
@@ -475,7 +533,6 @@ DBData(insn, var):-
 	_AssignVar(_, addressVar, base),
 	_Store(_, dynOffset, 0, var),
 	_AssignVar(_, dynOffset, base).
-	
 
 
 

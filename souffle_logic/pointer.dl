@@ -42,6 +42,7 @@
 		!_AssignType(_, var, "Call").
 
 	// Global variable
+	// $c = $a => $a = $b,$cc ...
 	RootVar("$a").
 
 	// Reciever
@@ -116,6 +117,8 @@
 		AllActionParam(action, index, name).
 
 	//iterator
+	#if Iterator 
+
 	.decl Iterator(insn: Insn, var: Var, to: Var)
 	.output Iterator 
 	Iterator(insn, var, var):-
@@ -170,6 +173,7 @@
 		loadOffset = to_number(num) + storeOffset,
 		_VarPointsTo(storedDynOffset, vars).
 
+	#endif
 
 	// _self and _code techniquecally are not loaded, 
 	// but included in this realtion for convenience.
