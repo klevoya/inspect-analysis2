@@ -244,7 +244,7 @@
 		_AssignVar(_,base, offsetVar),
 		_SimpleAssign(_, offsetVar, num),
 		to_string(storedOffset) = num,
-		n < 5.
+		n < 3.
 		
 
 	// memcpy($x, $y, size)
