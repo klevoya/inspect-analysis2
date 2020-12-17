@@ -116,8 +116,13 @@ _ActionInEqBranch(if, br, call, action):-
 /* Case (False Positive: Fixed by restrict false branch)
 	apply(){
 		if(code != receiver){
+			bb_head_1:
 			action1();
+
+			bb_head_3:
+			action3();
 		}
+		bb_head_2:
 		action2(); // reachable from both true/false branch
 	}
 	
@@ -130,6 +135,7 @@ _ActionInEqBranch(if, br, call, action):-
 	IfCodeNeReceiver(if, br, _)),
 	BasicBlockHead(callHead, call),
 	DominateBB(br, callHead),
+	// TODO: maybe not necessary
 	ReachableBtwBB(br, callHead).
 
 /***** Ne *****/
@@ -169,8 +175,10 @@ _ActionInNeBranch(if, br, call, action):-
 		if(code != receiver && action == ""){
 			action();
 		}
-
+		
+		br:
 		if(code != receiver){
+			br_2:
 			action();
 		}
 	}

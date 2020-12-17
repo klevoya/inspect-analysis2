@@ -195,6 +195,10 @@
 		2. Includes address storage as well, which should only be in StoreDataAddress. 
 		Hard to solve because of double negation
 	*/
+	// storeData
+	// storeDataAddress(storeData) <= storeData
+
+
 	// FirstLoadData(insn, to, root):-
 	// 	_Store(insn, _, _, to), 
 	// 	// !StoreDataAddress(insn, _, _, _, _, _),
@@ -206,6 +210,8 @@
 
 	StoreData(insn, dynOffset, offset, to):-
 		_VarPointsTo(var, to),
+		// LoadFirstData(apply())
+		// x = Load(...)
 		LoadData(_, _, to),
 		_Store(insn, dynOffsetVar, offset, var), 
 		_AssignVar(_, dynOffsetVar, dynOffset).
@@ -214,16 +220,21 @@
 	/* store the address that can point to data */
 	.decl StoreDataAddress (insn: Insn, dynOffset: Var, offset: number, addressVar: Var, index: number, data: Var)
 
-	// store(storedDynOffset_1 + storedOffset) = data
+	// store(storedDynOffset_1 + storedOffset) = data(key var)
 	// ...
-	// addressVar = storedDynOffset_2 + offsetVar
+	// offsetVar = num
+	// addressVar(base) = storedDynOffset_2 + offsetVar
 	// store(dynOffset + offset) = addressVar
 	StoreDataAddress(insn, dynOffset, offset, addressVar, n + 1, data):-
 		// the store statement for dynOffset
 		_Store(insn, dynOffset, offset, addressVar), 
 		// the store statement for data/address
 		(StoreData(_, storedDynOffset_1, storedOffset, data), n = 0;
-		StoreDataAddress(_, storedDynOffset_1, storedOffset, _, n, data)),
+		// remove data section to reduce copies of data,
+		// this should not change this result as we only need to get the data
+		// when the index is 0 in LoadData
+		StoreDataAddress(_, storedDynOffset_1, storedOffset, _, n, _), data="null"),
+		// StoreDataAddress(_, storedDynOffset_1, storedOffset, _, n, data)),
 		_VarPointsTo(addressVar, base),
 		// dynOffset points to the same root var
 		_AssignVar(_, base, storedDynOffset_2),
@@ -233,8 +244,18 @@
 		_AssignVar(_,base, offsetVar),
 		_SimpleAssign(_, offsetVar, num),
 		to_string(storedOffset) = num,
-		n < 2.
+		n < 5.
 		
+
+	// memcpy($x, $y, size)
+	// =>
+	// store($c + $d) = src
+	// $x = $a + $b | $x = $z
+	// $y = $c + $d | $y = $v
+	// => store($a + $b) = src
+
+
+
 	// TODO: Add memcpy 
 	// StoreData(insn, address, newOffset, data):-
 	// 	_Memcpy(insn, to, from, _),
@@ -245,6 +266,13 @@
 	// 	_SimpleAssign(_, offsetVar, storedOffset_2),
 	// 	storedOffset_1 = to_number(storedOffset_2),
 
+	/**
+	Stack:
+	store => size++
+	load => size--
+
+	stack.size == 0 => load the data
+	**/
 
 	/* load by calculating offset for stored address */
 	.decl LoadDataAddress(insn: Insn, to: Var, storedAddress: Var, index: number, data: Var)
@@ -252,7 +280,19 @@
 	// loadDynOffsetRoot = loadDynOffset + offsetVar
 	// ..... loadDynOffsetVar <- loadDynOffsetRoot
 	// load(loadDynOffsetVar + loadOffset)
-	LoadDataAddress(insn, to, storedAddress, n-1, data):-
+
+	// e.g.
+	// storeAddress($x + 10)
+	// $y = $x + 5
+	// loadAddress($y + 5)
+
+	// storeAddress($x + 10)
+	// $y = $x + 10
+	// loadAddress($y + 0)
+
+
+
+	LoadDataAddress(insn, to, storedAddress, n - 1, data):-
 		StoreDataAddress(_, storeDynOffset, storeOffset, storedAddress, n, data),
 		_Load(insn, loadDynOffsetVar, loadOffset, to),
 		_VarPointsTo(loadDynOffsetVar, loadDynOffsetRoot),
@@ -263,9 +303,28 @@
 		// offsetVar
 		_AssignVar(_, loadDynOffsetRoot, offsetVar),
 		_SimpleAssign(_, offsetVar, offset),
+		//hacky way to limit the size of integer
+		strlen(offset) < 5,
 		// offsetVar + loadOffset
 		storeOffset = to_number(offset) + loadOffset,
+		// a = load(b)
+		// b = load(a)
 		n > 0.
+
+
+	// storeAddress($x + 10)
+	// $y = $x
+	// loadAddress($y + 10)
+
+	/* load by direct match offset, 
+	TODO: needs double check for the correctness */
+	// LoadDataAddress(insn, to, storedAddress, n - 1, data):-
+	// 	StoreDataAddress(_, storeDynOffset, offset, storedAddress, n, data),
+	// 	_Load(insn, loadDynOffset, offset, to),
+	// 	// loadDynOffset
+	// 	_VarPointsTo(loadDynOffset, rootVar),
+	// 	_VarPointsTo(storeDynOffset, rootVar),
+	// 	n > 0.
 
 
 	/* Load data by either directly or adding certain offset*/
@@ -300,6 +359,8 @@
 		// loadAddress <- loadOffsetVar
 		_AssignVar(_, loadAddress, loadOffsetVar),
 		_SimpleAssign(_, loadOffsetVar, num),
+		//hacky way to limit the size of integer
+		strlen(num) < 5,
 		storeOffset = to_number(num) + loadOffset.
 
 	// load using loaded address
@@ -326,9 +387,11 @@
 
 	// the load for other variables uses a crude method
 	// copy assignment from dynOffset
+	// to = load(from)
 	InterCopyAssign(to, from):-
 		_Load(_, from, _, to),
-		!_InterCopyAssign(to, _).
+		!LoadData(_, to, _),
+		!LoadDataAddress(_, to, _, _, _).
 
 	// for the other vars, copy the data to the root var
 	InterCopyAssign(var, from):-

@@ -94,7 +94,7 @@ AuthorisedPayerForDB(check, payer, dbInsn):-
 /*  Possible false positive
 	Action1(){
 		1: require_auth (A) // Auth(A)
-		2: Func2(A)
+		2: Func3(A)
 		3: Func3(B)
 	}
 

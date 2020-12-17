@@ -411,7 +411,7 @@ $vq = $vo + $vp
 
 // Done via either memcpy or store the address that stores the data
 
-// The one used for dbOps
+// The one used for dbOps a = b + c
 // address with offset (dynOffset: $vq, offset: 16)
 .decl _DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
 
