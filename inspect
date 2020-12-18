@@ -9,7 +9,11 @@ def string_from_long(action):
     charmap = ['.','1','2','3','4','5','a','b','c','d','e','f','g','h','i',
                 'j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z']
     str = [None] * 13
-    tmp = int(float(action))
+    try:
+    	tmp = int(action)
+    except ValueError:
+    	return action
+    	
     for i in range(13):
         c = charmap[int(tmp & (0x0f if i == 0 else 0x1f))]
         str[12-i] = c
@@ -72,18 +76,26 @@ def print_result(violation_file):
 		for row in reader:
 			print(nuetral("Action: ") + action_name[row[0]] if row[0] in action_name else row[0], end="	")
 			rest = nuetral("Insn: ") + row[1] if len(row) > 1 else ""
+			rest += nuetral("\tTable: ") + string_from_long(row[2]) if len(row) > 2 else ""
 			print(rest)
 	print()
 
+def print_action_name(action_name):
+    for func in action_name:
+        print(func, "->", action_name[func])
+    print()
+
+print("Action Names:")
+print_action_name(action_name)
+
 print(bold("Analysis Result\n"))
-# print("Action Names:")
-# print(action_name, end="\n\n")
 print_result("AuthViolation.csv")
 print_result("RollbackViolation.csv")
 print_result("FakeTokenViolation.csv")
 print_result("FakeNotifyViolation.csv")
 print_result("SeperationViolation.csv")
 print_result("OverflowViolation.csv")
+print_result("UnboundedViolation.csv")
 
 run_time = time.time() - start_time
 run_time_m = str(int(run_time // 60)) + "m "if run_time // 60 > 0 else ""

@@ -3,10 +3,15 @@
 ** e.g. Actions, DBInsn etc **
 ******************************/
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	#if VERBOSE
 		.output CheckTransfer
 		.output CheckEOSIO
+		.output DBFind
 		.output DBFindReachable
 		.output DBUpdateSamePayer
 		.output _DBInsn
@@ -17,6 +22,7 @@
 		.output DBDataAddress3
 	#endif
 	.output DBRemove
+	.output DBUpdate
 	.output Action
 	.output ActionParam
 	.output AllActionParam
@@ -30,6 +36,10 @@
 #endif
 
 .output ActionCondition
+.output TableReference
+
+/************/
+
 
 /***********
 ** Action **
@@ -230,7 +240,8 @@ ActionCondition(action, constant):-
 	BasicBlockHead(toBranch, call),
 	_SimpleAssign(_, constVar, constant),
 	_AssignVar(_, ifVar, constVar),
-	_Branch(_, _, toBranch, ifVar).
+	(_Branch(_, _, toBranch, ifVar);
+    _Branch(_, toBranch, _, ifVar)).
 
 /* actions that contains dbOps */
 .decl DBAction(action: Function)
@@ -244,22 +255,56 @@ DBAction(action):-
 ** DB Related **
 ****************/
 
-/* DB remove insn and its payer */
+/* DB remove/update insn and its db_find insn */
 
-/* payer of db_remove is obtained from db_find(s) */
-.decl _DBRemove(removeInsn: Insn, findInsn: Insn, payer: Var)
+/* payer/table of db_remove/db_update is obtained from db_find(s) */
+.decl DBFind(dbInsn: Insn, findInsn: Insn)
 
-_DBRemove(removeInsn, findInsn, payer):-
-	ActionFuncReachable(action, "db_remove_i64", removeInsn),
-	ActionFuncReachable(action, "db_find_i64", findInsn),
-	_ActualArgs(findInsn, _, 3, payer).
+#if Iterator 
 
-/* for each db_remove insn, db_find_1 can reach to db_find2 */
-.decl DBFindReachable(removeInsn: Insn, findInsn1: Insn, findInsn2: Insn)
+DBFind(dbInsn, findInsn):-
+	(_DBUpdate(dbInsn, itr, _, _);
+	_DBRemove(dbInsn, itr)),
+	// to -> itr
+	pointer.VarPointsTo(itr, to),
+	// itr = db_find(...)
+	_ActualReturn(findInsn, _, to).
 
-DBFindReachable(removeInsn, findInsn1, findInsn2):-
-	_DBRemove(removeInsn, findInsn1, _),
-	_DBRemove(removeInsn, findInsn2, _ ),
+#else
+
+DBFind(dbInsn, findInsn):-
+	(ActionFuncReachable(action, "db_remove_i64", dbInsn);
+	ActionFuncReachable(action, "db_update_i64", dbInsn)),
+	ActionFuncReachable(action, find_func, findInsn),
+	(find_func = "db_find_i64";
+	find_func = "db_lowerbound_i64";
+	find_func = "db_upperbound_i64";
+	find_func = "db_end_i64").
+
+#endif
+
+
+/** In case there are two db_find for the same dbInsn,
+choose the closest one, see no_auth_remove2 **/
+
+/* for each db_remove/db_update insn, db_find_1 can reach to db_find2 */
+.decl DBFindReachable(dbInsn: Insn, findInsn1: Insn, findInsn2: Insn)
+
+// Works
+// db_find_1 => br1 | br2
+// br1 => db_find_2
+
+// Not Works
+// ... => br1 | br2
+// br1 => db_find_1
+// br2 => db_find_2
+// br1 | br2 => db_remove
+
+// db_find_1 -> db_find_2 (linear)
+// db_find_2 => db_remove
+DBFindReachable(dbInsn, findInsn1, findInsn2):-
+	DBFind(dbInsn, findInsn1),
+	DBFind(dbInsn, findInsn2),
 	findInsn1 != findInsn2,
 	//  reachable in BB
 	(ReachableInBB(findInsn1, findInsn2);
@@ -269,11 +314,25 @@ DBFindReachable(removeInsn, findInsn1, findInsn2):-
 	ReachableBtwBB(head1, head2)).
 
 /* select the closest db_find for db_remove */
-.decl DBRemove(insn: Insn, payer: Var)
+.decl DBRemove(insn: Insn, table: Var, payer: Var)
 
-DBRemove(removeInsn, payer):-
-	_DBRemove(removeInsn, findInsn, payer),
+DBRemove(removeInsn, tableVar, payer):-
+	_DBRemove(removeInsn, _),
+	DBFind(removeInsn, findInsn),
+	_ActualArgs(findInsn, _, 2, tableVar),
+	_ActualArgs(findInsn, _, 3, payer),
+	// cannot reach to another find insn 
 	!DBFindReachable(removeInsn, findInsn, _).
+
+/* select the closest db_find for db_update */
+.decl DBUpdate(insn: Insn, tableVar: Var, payer: Var)
+
+DBUpdate(updateInsn, tableVar, payer):-
+	_DBUpdate(updateInsn, _, payer, _),
+	DBFind(updateInsn, findInsn),
+	_ActualArgs(findInsn, _, 2, tableVar),
+	// cannot reach to another find insn 
+	!DBFindReachable(updateInsn, findInsn, _).
 
 
 /* DB update on the same payer */
@@ -285,26 +344,36 @@ DBUpdateSamePayer(insn):-
 	pointer.VarPointsTo(payer, var),
 	_SimpleAssign(_, var, "0").
 
+
+.decl TableReference(insn: Insn, table: symbol)
+
+TableReference(insn, table):-
+	(_DBStore(insn, _, tableVar, _, _, _);
+	DBRemove(insn, tableVar, _);
+	DBUpdate(insn, tableVar, _)),
+	_SimpleAssign(_, tableVar, table).
+
 /* all DBOps and their payer variables*/
 .decl _DBInsn(insn: Insn, payer: Var)
 
 _DBInsn(insn, payer):-
-	_DBStore(insn, _, payer, _, _);
+	_DBStore(insn, _, _, payer, _, _);
 	_DBUpdate(insn, _, payer, _);
-	DBRemove(insn, payer).
+	DBRemove(insn, _, payer).
 
-/* if payers are _self or _code for easier debug process */
+/* if payers are _self or _code for easier debug process,
+   and remove other pointed vars to eliminate false positive */
 .decl DBInsn(insn: Insn, payer: Var)
 
 // if payer is _self
 DBInsn(insn, "_self"):-
 	_DBInsn(insn, payer),
-	pointer.VarPointsTo(payer,"_self").
+	pointer.VarPointsTo(payer, "_self").
 
 // if payer is _code
 DBInsn(insn, "_code"):-
 	_DBInsn(insn, payer),
-	pointer.VarPointsTo(payer,"_code").
+	pointer.VarPointsTo(payer, "_code").
 
 // else keep the same payer var
 DBInsn(insn, payer):-
@@ -317,8 +386,9 @@ DBInsn(insn, payer):-
 ** DB Payload **
 ****************/
 
-// Example
+// Example_1 (unsafe_store2.wasm | code may change due to decompiler update)
 /*
+$um = $ue
 store(dyn_offset = $um + memarg.offset: 8) = $up
 
 ....
@@ -341,13 +411,13 @@ $vq = $vo + $vp
 
 // Done via either memcpy or store the address that stores the data
 
-// The one used for dbOps
-// address with offset
+// The one used for dbOps a = b + c
+// address with offset (dynOffset: $vq, offset: 16)
 .decl _DBDataAddress(insn: Insn, dynOffset: Var, offset: symbol)
 
 _DBDataAddress(insn, dynOffset, offset):-
 	(_DBUpdate(insn, _, _, address);
-	_DBStore(insn, _, _, _, address)),
+	_DBStore(insn, _, _, _, _, address)),
 	_AssignType(_, address, "Add"),
 	_AssignVar(_, address, dynOffset),
 	_AssignVar(_, address, memarg),
@@ -356,7 +426,7 @@ _DBDataAddress(insn, dynOffset, offset):-
 
 
 // The one that used for memcpy
-// when the address is form of x = y + z
+// The copied memoery in memcpy (dynOffset: $ut)
 .decl DBDataAddress1(insn: Insn, dynOffset: Var)
 
 DBDataAddress1(insn, from):-
@@ -369,31 +439,38 @@ DBDataAddress1(insn, from):-
 	_AssignVar(_, dynOffset2, base).
 
 
-// when address is the form of x = y
-.decl DBDataAddress2(insn: Insn, dynOffset: Var)
+/**
+Example_2 (unsafe_db.wasm):
+
+$bka = $bjf (get_local[1])
+store(dyn_offset = $bka + memarg.offset: 8) = $bkg
+
+...
+
+$bkp = $bko (get_local[3])
+$bkq = $bjf (get_local[1])
+$bkr = 8
+($bks) = memcpy($bkp, $bkq, $bkr)
+
+...
+
+$ble = $bko (get_local[3])
+() = db_update_i64($blc, $bld, $ble, $blf)
+**/
+
+// when address is the form of x = y (address: $bkq)
+.decl DBDataAddress2(insn: Insn, address: Var)
 
 DBDataAddress2(insn, from):-
 	(_DBUpdate(insn, _, _, address);
-	_DBStore(insn, _, _, _, address)),
+	_DBStore(insn, _, _, _, _, address)),
 	_AssignType(_, address, "Copy"),
 	pointer.VarPointsTo(address, base),
 	pointer.VarPointsTo(to, base),
 	_MemCopy(_, to, from, _).
 
 
-// when address is used directly to store data address
-.decl DBDataAddress3(insn: Insn, var: Var)
-
-DBDataAddress3(insn, var):-
-	(_DBUpdate(insn, _, _, address);
-	_DBStore(insn, _, _, _, address)),
-	_AssignType(_, address, "Copy"),
-	_AssignVar(_, address, base),
-	_Store(_, storeDynOffset, _, var),
-	_AssignVar(_, storeDynOffset, base).
-
-
-// The actual data
+// The actual data (var: $up in ex_1 and $bkg in ex_2)
 .decl DBData(insn: Insn, var: Var)
 
 DBData(insn, var):-
@@ -403,8 +480,38 @@ DBData(insn, var):-
 	_AssignVar(_, dynOffset, base),
 	_AssignVar(_, storeDynOffset, base).
 
+/** Example_3(unsafe_store.wasm)
 
-// when memarg.offset != 0
+$xh = $wt
+store(dyn_offset = $xh + memarg.offset: 16) = $xm
+
+...
+
+$yf = $wk (get_local[4])
+$yg = $wt (get_local[5])
+$yh = 16
+$yi = $yg + $yh
+store(dyn_offset = $yf + memarg.offset: 56) = $yi
+
+...
+
+$yx = $wk (get_local[4])
+($yz) = db_store_i64($yr, $ys, $yt, $yv, $yx, $yy)
+**/
+
+// when address is used directly to store data address 
+.decl DBDataAddress3(insn: Insn, var: Var)
+
+// regardless of the memarg offset, as it could be an array of data (var: $yi)
+DBDataAddress3(insn, var):-
+	(_DBUpdate(insn, _, _, address);
+	_DBStore(insn, _, _, _, _, address)),
+	_AssignType(_, address, "Copy"),
+	_AssignVar(_, address, base),
+	_Store(_, storeDynOffset, _, var),
+	_AssignVar(_, storeDynOffset, base).
+
+// when memarg.offset != 0 (var: $xm in ex_3)
 DBData(insn, var):-
 	DBDataAddress3(insn, addressVar),
 	// dynOffset = base
@@ -426,7 +533,6 @@ DBData(insn, var):-
 	_AssignVar(_, addressVar, base),
 	_Store(_, dynOffset, 0, var),
 	_AssignVar(_, dynOffset, base).
-	
 
 
 

@@ -1,6 +1,7 @@
-Auth	0
+Auth	1
 Rollback	0
 FakeToken	0
 FakeNotify	0
 Seperation	0
 Overflow	0
+Unbounded	0

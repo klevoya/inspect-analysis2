@@ -11,6 +11,10 @@ Three layers:
 	Flow-sensitive: check if require_auth dominate the function call with the correpsonding payer varaible (ordered matching)
 */
 
+/***********
+** Output **
+************/
+
 #if DEBUG
 	#if VERBOSE
 		.output SafeDBOps
@@ -24,9 +28,11 @@ Three layers:
 
 .output AuthViolation
 
+/************/
 
 /* violation DBinsn and its actions */
-.decl AuthViolation(action: Function, insn: Insn)
+.decl _AuthViolation(action: Function, insn: Insn)
+.decl AuthViolation(action: Function, insn: Insn, table: symbol)
 
 /* require_auth dom DBOps wihtin CFG */
 .init auth_dom_db = CFGDom
@@ -88,7 +94,7 @@ AuthorisedPayerForDB(check, payer, dbInsn):-
 /*  Possible false positive
 	Action1(){
 		1: require_auth (A) // Auth(A)
-		2: Func2(A)
+		2: Func3(A)
 		3: Func3(B)
 	}
 
@@ -128,8 +134,9 @@ SafeDBOpsInAction(action, dbInsn):-
 */
 
 // If miss any payer authorisation 
-AuthViolation(action, dbInsn):-
+_AuthViolation(action, dbInsn):-
 	PossibleAuthViolation(dbInsn),
+	DBInsn(dbInsn, _),
 	!AuthorisedPayerForDB(_, to, dbInsn),
 	!SafeDBOpsInAction(action, dbInsn),
 	DBInsn(dbInsn, payer),
@@ -179,12 +186,22 @@ PayerInFuncCallPointsTo(dbInsn, to, funcCall):-
 	_ActualArgs(funcCall, func, index, actualVar),
 	pointer.VarPointsTo(actualVar, to).
 
-/* For mixed order require_auth and DBOps function call */
-AuthViolation(action, dbInsn):-
+/* for mixed order require_auth and DBOps function call */
+_AuthViolation(action, dbInsn):-
 	PayerInFuncCallPointsTo(dbInsn, to, funcCall),
+	DBInsn(dbInsn, _),
 	!auth_dom_db.SrcDomFunc(check, _, funcCall),
 	_ActualArgs(check, "require_auth", 0, authVar),
 	pointer.VarPointsTo(authVar, to),
 	ActionFuncReachable(action, _, dbInsn).
 
+/* add table reference */
+AuthViolation(action, dbInsn, table):-
+	_AuthViolation(action, dbInsn),
+	TableReference(dbInsn, table).
+
+/* add table reference */
+AuthViolation(action, dbInsn, "Unkown Table"):-
+	_AuthViolation(action, dbInsn),
+	!TableReference(dbInsn, _).
 

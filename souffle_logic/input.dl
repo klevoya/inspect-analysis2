@@ -6,12 +6,16 @@
 .type Function <: symbol
 
 /* db_store insn */
-.decl _DBStore(insn: Insn, itr:Var, payer:Var, key:Var, data:Var)
+.decl _DBStore(insn: Insn, itr:Var, table: Var, payer:Var, key:Var, data:Var)
 GET_REL_FROM_FILE(_DBStore, "must/dbstore.facts")
 
 /* db_update insn */
 .decl _DBUpdate(insn: Insn, itr: Var, payer: Var, data: Var)
 GET_REL_FROM_FILE(_DBUpdate, "must/dbupdate.facts")
+
+/* db_remove insn */
+.decl _DBRemove(insn: Insn, itr: Var)
+GET_REL_FROM_FILE(_DBRemove, "must/dbremove.facts")
 
 /* insn: to <- from */
 .decl _AssignVar(insn: Insn, to: Var, from: Var)

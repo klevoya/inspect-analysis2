@@ -3,7 +3,11 @@
 #define VERBOSE 1
 
 // May analysis will report less violation; May ⊆ Must
+// This is only for SrcDomTarget atm (only Src)
 #define MayAnalysis 0 
+
+// for acurate db_find mapping with db_update/db_remove
+#define Iterator 0
 
 #include "control.dl"
 #include "pointer.dl"
@@ -18,6 +22,7 @@
 #include "patterns/fake_notify.dl"
 #include "patterns/seperation.dl"
 #include "patterns/overflow.dl"
+#include "patterns/unbounded.dl"
 
 
 // Final Results for test suite
@@ -25,7 +30,7 @@
 .output Result
 
 Result("Auth", num):-
-	num = count : AuthViolation(_, _).
+	num = count : AuthViolation(_, _, _).
 
 Result("Rollback", num):-
 	num = count : RollbackViolation(_, _).
@@ -41,3 +46,6 @@ Result("Seperation", num):-
 
 Result("Overflow", num):-
 	num = count : OverflowViolation(_, _).
+
+Result("Unbounded", num):-
+    num = count : UnboundedViolation(_, _).

@@ -1,258 +1,419 @@
 
 .comp Pointer {
 
-#if DEBUG
-	#if VERBOSE
-		.output RootVar
-		.output IntraCopyAssign
-		.output InterCopyAssign
-		.output FirstLoadData
-		.output StoreData
-		.output StoreDataAddress
-		.output LoadDataAddress
-		.output _VarPointsTo
+	/***********
+	** Output **
+	************/
+
+	#if DEBUG
+		#if VERBOSE
+			.output RootVar
+			.output IntraCopyAssign
+			.output InterCopyAssign
+			.output FirstLoadData
+			.output StoreData
+			.output StoreDataAddress
+			.output LoadDataAddress
+			.output _VarPointsTo
+		#endif
+		.output LoadData
+		.output VarPointsTo
 	#endif
-	.output LoadData
-	.output VarPointsTo
-#endif
 
-// every variable in phi assignment is a copy assignment to the new variable
-_AssignVar(insn, to, from),
-_AssignType(insn, to, "Copy"):-
-	_Phi(insn, to, from).
+	/************/
 
-
-/*************
-** Root Var **
-**************/
-
-/* root variables are the variables that can be pointed to in VarPointsTo */
-.decl RootVar(var: Var)
-
-// Root Var includes const, arithmetic result and entry point parameters
-RootVar(var):-
-	_AssignType(_, var, _),
-	!_AssignType(_, var, "Copy"),
-	!_AssignType(_, var, "Call").
-
-// Global variable
-RootVar("$a").
-
-// Reciever
-RootVar("_self").
-
-// Code
-RootVar("_code").
-
-// entry function('apply') parameters other than _self and _code
-RootVar(var):-
-	_FormalArgs(_, "apply", n, var),
-	n != 0,
-	n != 1.
-
-
-/*******************
-** VarPointsTo_v1 **
-********************/
-
-/* copys wihtin function */
-.decl IntraCopyAssign(insn: Insn, to: Var, from: Var)
-
-IntraCopyAssign(insn, to, from):-
+	// every variable in phi assignment is a copy assignment to the new variable
 	_AssignVar(insn, to, from),
-	_AssignType(insn, to, "Copy"),
-	// exclude global variables to prevent loop
-	to != "$a".
-
-/* add parameter/return mapping */
-.decl _InterCopyAssign(to: Var, from: Var)
-
-// includes intra copys
-_InterCopyAssign(to, from):-
-	IntraCopyAssign(_, to, from).
-
-// argument mapping
-_InterCopyAssign(to, from):-
-	_ActualArgs(_, func, index, from),
-	_FormalArgs(_, func, index, to).
-
-// return value mapping
-_InterCopyAssign(to, from):-
-	_FormalReturn(_, func, from),
-	_ActualReturn(_, func, to).
-
-/* VarPointsTo_v1 to avoid double negation later in store/load mapping */
-.decl _VarPointsTo(var1: Var, var2: Var)
-
-// base case
-_VarPointsTo(var, var):-
-	RootVar(var).
-
-// recursion
-_VarPointsTo(to, var):-
-	_InterCopyAssign(to, from),
-	_VarPointsTo(from, var).
+	_AssignType(insn, to, "Copy"):-
+		_Phi(insn, to, from).
 
 
-/***********************
-** Load/Store Mapping **
-************************/
+	/*************
+	** Root Var **
+	**************/
 
-/* first appearance of the data (e.g. action parameters) */
-.decl FirstLoadData(insn: Insn, to: Var, from: Var)
+	/* root variables are the variables that can be pointed to in VarPointsTo */
+	.decl RootVar(var: Var)
 
-// direct load action parameter from memcpy
-FirstLoadData(insn, to, name):-
-	_Load(insn, from, offset, to),
-	_AssignVar(_, from, base),
-	ActionParam(action, base, offsetSymbol, index),
-	offset = to_number(offsetSymbol),
-	AllActionParam(action, index, name).
+	// Root Var includes const, arithmetic result and entry point parameters
+	RootVar(var):-
+		_AssignType(_, var, _),
+		!_AssignType(_, var, "Copy"),
+		!_AssignType(_, var, "Call").
 
-// _self and _code techniquecally are not loaded, 
-// but included in this realtion for convenience.
+	// Global variable
+	// $c = $a => $a = $b,$cc ...
+	RootVar("$a").
 
-//  from apply function
-FirstLoadData("apply_self", to, "_self"):-
-	_FormalArgs(_, "apply", 0, to).
+	// Reciever
+	RootVar("_self").
 
-FirstLoadData("apply_code", to, "_code"):-
-	_FormalArgs(_, "apply", 1, to).
+	// Code
+	RootVar("_code").
 
-// _self from current_receiver call
-FirstLoadData(insn, var, "_self"):-
-	_ActualReturn(insn, "current_receiver", var).
-
-
-/* store data directly */
-.decl StoreData(insn: Insn, address: Var, offset: number, var: Var)
-
-StoreData(insn, address, offset, to):-
-	_VarPointsTo(var, to),
-	FirstLoadData(_, _, to),
-	_Store(insn, addressVar, offset, var), 
-	_AssignVar(_, addressVar, address).
+	// entry function('apply') parameters other than _self and _code
+	RootVar(var):-
+		_FormalArgs(_, "apply", n, var),
+		n != 0,
+		n != 1.
 
 
-/* store the address that can point to data */
-.decl StoreDataAddress (insn: Insn, dynOffset: Var, offset: number, addressVar: Var, index: number, data: Var)
+	/*******************
+	** VarPointsTo_v1 **
+	********************/
 
-StoreDataAddress(insn, dynOffset, offset, addressVar, n + 1, data):-
-	// the store statement for dynOffset
-	_Store(insn, dynOffset, offset, addressVar), 
-	// the store statement for data/address
-	(StoreData(_, storedDynOffset_1, storedOffset, data), n = 0;
-	StoreDataAddress(_, storedDynOffset_1, storedOffset, _, n, data)),
-	_VarPointsTo(addressVar, base),
-	// dynOffset points to the same root var
-	_AssignVar(_, base, storedDynOffset_2),
-	_VarPointsTo(storedDynOffset_1, rootVar),
-	_VarPointsTo(storedDynOffset_2, rootVar),
-	// the stored offset is same
-	_AssignVar(_,base, offsetVar),
-	_SimpleAssign(_, offsetVar, num),
-	to_string(storedOffset) = num,
-	n < 2.
-	
+	/* copys wihtin function */
+	.decl IntraCopyAssign(insn: Insn, to: Var, from: Var)
 
-/* load by calculating offset for stored address */
-.decl LoadDataAddress(insn: Insn, to: Var, storedAddress: Var, index: number, data: Var)
+	IntraCopyAssign(insn, to, from):-
+		_AssignVar(insn, to, from),
+		_AssignType(insn, to, "Copy"),
+		// exclude global variables to prevent loop
+		to != "$a".
 
-// loadDynOffsetRoot = loadDynOffset + offsetVar
-// ..... loadDynOffsetVar <- loadDynOffsetRoot
-// load(loadDynOffsetVar + loadOffset)
-LoadDataAddress(insn, to, storedAddress, n-1, data):-
-	StoreDataAddress(_, storeDynOffset, storeOffset, storedAddress, n, data),
-	_Load(insn, loadDynOffsetVar, loadOffset, to),
-	_VarPointsTo(loadDynOffsetVar, loadDynOffsetRoot),
-	// loadDynOffset
-	_AssignVar(_, loadDynOffsetRoot, loadDynOffset),
-	_VarPointsTo(loadDynOffset, rootVar),
-	_VarPointsTo(storeDynOffset, rootVar),
-	// offsetVar
-	_AssignVar(_, loadDynOffsetRoot, offsetVar),
-	_SimpleAssign(_, offsetVar, offset),
-	// offsetVar + loadOffset
-	storeOffset = to_number(offset) + loadOffset,
-	n > 0.
+	/* add parameter/return mapping */
+	.decl _InterCopyAssign(to: Var, from: Var)
 
+	// includes intra copys
+	_InterCopyAssign(to, from):-
+		IntraCopyAssign(_, to, from).
 
-/* Load data by either directly or adding certain offset*/
-.decl LoadData(insn: Insn, to: Var, from: Var)
+	// argument mapping
+	_InterCopyAssign(to, from):-
+		_ActualArgs(_, func, index, from),
+		_FormalArgs(_, func, index, to).
 
-// pass as copy assignment
-LoadData(insn, to, from):-
-	FirstLoadData(insn, to, from).
+	// return value mapping
+	_InterCopyAssign(to, from):-
+		_FormalReturn(_, func, from),
+		_ActualReturn(_, func, to).
 
-// load data by directly mataching offset
-LoadData(insn, to, from):-
-	StoreData(_, storeDynOffset, offset, from),
-	_Load(insn, loadDynOffset, offset, to),
-	_VarPointsTo(storeDynOffset, address),
-	_VarPointsTo(loadDynOffset, address).
+	/* VarPointsTo_v1 to avoid double negation later in store/load mapping */
+	.decl _VarPointsTo(var1: Var, var2: Var)
+
+	// base case
+	_VarPointsTo(var, var):-
+		RootVar(var).
+
+	// recursion
+	_VarPointsTo(to, var):-
+		_InterCopyAssign(to, from),
+		_VarPointsTo(from, var).
 
 
-// store(storeDynOffset + storeOffset) = from
-// loadAddressVar = loadDynOffset + loadOffsetVar
-// to = load(loadAddressVar + loadOffset) 
-// ---> loadOffsetVar + loadOffset = storeOffset
+	/***********************
+	** Load/Store Mapping **
+	************************/
 
-// load data by computing the offset 
-LoadData(insn, to, from):-
-	StoreData(_, storeDynOffset, storeOffset, from),
-	_Load(insn, loadAddressVar, loadOffset, to),
-	_VarPointsTo(loadAddressVar, loadAddress),
-	// loadAddress <- dynOffset
-	_AssignVar(_, loadAddress, loadDynOffset),
-	_VarPointsTo(loadDynOffset, dynOffset),
-	_VarPointsTo(storeDynOffset, dynOffset),
-	// loadAddress <- loadOffsetVar
-	_AssignVar(_, loadAddress, loadOffsetVar),
-	_SimpleAssign(_, loadOffsetVar, num),
-	storeOffset = to_number(num) + loadOffset.
+	/* first appearance of the data (e.g. action parameters) */
+	.decl FirstLoadData(insn: Insn, to: Var, from: Var)
 
-// load using loaded address
-LoadData(insn, to, data):-
-	LoadDataAddress(_, address, _, 0, data),
-	_Load(insn, address, 0, to).
+	// direct load action parameter from memcpy
+	FirstLoadData(insn, to, name):-
+		_Load(insn, from, offset, to),
+		_AssignVar(_, from, base),
+		ActionParam(action, base, offsetSymbol, index),
+		offset = to_number(offsetSymbol),
+		AllActionParam(action, index, name).
 
+	//iterator
+	#if Iterator 
 
-/*******************
-** VarPointsTo_v2 **
-********************/
-
-// load data/address, 
-// pass as copy assignment 
-// recursive because loadData uses IntraCopyAssign
-RootVar(from),
-IntraCopyAssign(insn, to, from):-
-	LoadData(insn, to, from);
-	LoadDataAddress(insn, to, from, _, _).
+	.decl Iterator(insn: Insn, var: Var, to: Var)
+	.output Iterator 
+	Iterator(insn, var, var):-
+		_ActualReturn(insn, "db_find_i64", var);
+		_ActualReturn(insn, "db_lowerbound_i64", var);
+		_ActualReturn(insn, "db_end_i64", var).
 
 
-/* the complete set of vriable assignments */
-.decl InterCopyAssign(to: Var, from: Var)
+	// take iterator and return an iterator
+	// itr_1 = db_next_i64(itr_2, ...)
+	Iterator(insn, to, from):-
+		(_ActualReturn(prevInsn, "db_previous_i64", to);
+		_ActualReturn(prevInsn, "db_next_i64", to)),
+		_ActualArgs(prevInsn, _, 0, itr),
+		_VarPointsTo(itr, from),
+		Iterator(insn, _, from).
 
-// the load for other variables uses a crude method
-// copy assignment from dynOffset
-InterCopyAssign(to, from):-
-	_Load(_, from, _, to),
-	!_InterCopyAssign(to, _).
+	FirstLoadData(insn, to, from):-
+		Iterator(insn, to, from).
 
-// inherit the v1 relation
-InterCopyAssign(to, from):-
-	_InterCopyAssign(to, from).
+	.decl StoreDataDynOffset(insn: Insn, dynOffset: Var, offset: number, toStoreDynOffset: Var, data: Var)
+	.output StoreDataDynOffset
 
-/* VarPointsTo_v2 set including store/load mapping for certain variables */
-.decl VarPointsTo(var1: Var, var2: Var)
+	// storedDynOffset = base
+	// store(storedDynOffset + storedOffset) = data
+	// ...
+	// toStoreDynOffset = base
+	// store(dynOffset + offset) = toStoreDynOffset
 
-// inherit the v1 relation
-VarPointsTo(var, to):-
-	_VarPointsTo(var, to).
+	StoreDataDynOffset(insn, dynOffset, offset, toStoreDynOffset, data):-
+		_Store(insn, dynOffset, offset, toStoreDynOffset),
+		StoreData(_, storedDynOffset, _, data),
+		_VarPointsTo(toStoreDynOffset, base),
+		_VarPointsTo(storedDynOffset, base).
 
-// v2 addition
-VarPointsTo(var, to):-
-	VarPointsTo(from, to),
-	InterCopyAssign(var, from).
+
+	.decl LoadDataDynOffset(insn: Insn, to: Var, storedDynOffset: Var, data: Var)
+	.output LoadDataDynOffset
+
+	_VarPointsTo(to, vars),
+	LoadDataDynOffset(insn, to, storedDynOffset, data):-
+		StoreDataDynOffset(_, storeDynOffset_1, storeOffset, storedDynOffset, data),
+		_Load(insn, loadDynOffset, loadOffset, to),
+		_VarPointsTo(storeDynOffset_1, base),
+		// base <- dynOffset
+		_AssignVar(_, base, storeDynOffset_2),
+		_VarPointsTo(storeDynOffset_2, root),
+		_VarPointsTo(loadDynOffset, root),
+		// base <- storeOffsetVar
+		_AssignVar(_, base, storeOffsetVar),
+		_SimpleAssign(_, storeOffsetVar, num),
+		loadOffset = to_number(num) + storeOffset,
+		_VarPointsTo(storedDynOffset, vars).
+
+	#endif
+
+	// _self and _code techniquecally are not loaded, 
+	// but included in this realtion for convenience.
+
+	//  from apply function
+	FirstLoadData("apply_self", to, "_self"):-
+		_FormalArgs(_, "apply", 0, to).
+
+	FirstLoadData("apply_code", to, "_code"):-
+		_FormalArgs(_, "apply", 1, to).
+
+	// _self from current_receiver call
+	FirstLoadData(insn, var, "_self"):-
+		_ActualReturn(insn, "current_receiver", var).
+
+	// other variable that can be stored directly
+	/*  Problems: 
+		1. Performance bottleneck, comment out for faster execution
+		2. Includes address storage as well, which should only be in StoreDataAddress. 
+		Hard to solve because of double negation
+	*/
+	// storeData
+	// storeDataAddress(storeData) <= storeData
+
+
+	// FirstLoadData(insn, to, root):-
+	// 	_Store(insn, _, _, to), 
+	// 	// !StoreDataAddress(insn, _, _, _, _, _),
+	// 	_VarPointsTo(to, root).
+
+
+	/* store data directly */
+	.decl StoreData(insn: Insn, dynOffset: Var, offset: number, var: Var)
+
+	StoreData(insn, dynOffset, offset, to):-
+		_VarPointsTo(var, to),
+		// LoadFirstData(apply())
+		// x = Load(...)
+		LoadData(_, _, to),
+		_Store(insn, dynOffsetVar, offset, var), 
+		_AssignVar(_, dynOffsetVar, dynOffset).
+
+
+	/* store the address that can point to data */
+	.decl StoreDataAddress (insn: Insn, dynOffset: Var, offset: number, addressVar: Var, index: number, data: Var)
+
+	// store(storedDynOffset_1 + storedOffset) = data(key var)
+	// ...
+	// offsetVar = num
+	// addressVar(base) = storedDynOffset_2 + offsetVar
+	// store(dynOffset + offset) = addressVar
+	StoreDataAddress(insn, dynOffset, offset, addressVar, n + 1, data):-
+		// the store statement for dynOffset
+		_Store(insn, dynOffset, offset, addressVar), 
+		// the store statement for data/address
+		(StoreData(_, storedDynOffset_1, storedOffset, data), n = 0;
+		// remove data section to reduce copies of data,
+		// this should not change this result as we only need to get the data
+		// when the index is 0 in LoadData
+		StoreDataAddress(_, storedDynOffset_1, storedOffset, _, n, _), data="null"),
+		// StoreDataAddress(_, storedDynOffset_1, storedOffset, _, n, data)),
+		_VarPointsTo(addressVar, base),
+		// dynOffset points to the same root var
+		_AssignVar(_, base, storedDynOffset_2),
+		_VarPointsTo(storedDynOffset_1, rootVar),
+		_VarPointsTo(storedDynOffset_2, rootVar),
+		// the stored offset is same
+		_AssignVar(_,base, offsetVar),
+		_SimpleAssign(_, offsetVar, num),
+		to_string(storedOffset) = num,
+		n < 3.
+		
+
+	// memcpy($x, $y, size)
+	// =>
+	// store($c + $d) = src
+	// $x = $a + $b | $x = $z
+	// $y = $c + $d | $y = $v
+	// => store($a + $b) = src
+
+
+
+	// TODO: Add memcpy 
+	// StoreData(insn, address, newOffset, data):-
+	// 	_Memcpy(insn, to, from, _),
+	// 	StoreData(_, storedDynOffset, storedOffset_1, data),
+	// 	_VarPointsTo(from, dynOffsetVar),
+
+	// 	_VarPointsTo(from, offsetVar),
+	// 	_SimpleAssign(_, offsetVar, storedOffset_2),
+	// 	storedOffset_1 = to_number(storedOffset_2),
+
+	/**
+	Stack:
+	store => size++
+	load => size--
+
+	stack.size == 0 => load the data
+	**/
+
+	/* load by calculating offset for stored address */
+	.decl LoadDataAddress(insn: Insn, to: Var, storedAddress: Var, index: number, data: Var)
+
+	// loadDynOffsetRoot = loadDynOffset + offsetVar
+	// ..... loadDynOffsetVar <- loadDynOffsetRoot
+	// load(loadDynOffsetVar + loadOffset)
+
+	// e.g.
+	// storeAddress($x + 10)
+	// $y = $x + 5
+	// loadAddress($y + 5)
+
+	// storeAddress($x + 10)
+	// $y = $x + 10
+	// loadAddress($y + 0)
+
+
+
+	LoadDataAddress(insn, to, storedAddress, n - 1, data):-
+		StoreDataAddress(_, storeDynOffset, storeOffset, storedAddress, n, data),
+		_Load(insn, loadDynOffsetVar, loadOffset, to),
+		_VarPointsTo(loadDynOffsetVar, loadDynOffsetRoot),
+		// loadDynOffset
+		_AssignVar(_, loadDynOffsetRoot, loadDynOffset),
+		_VarPointsTo(loadDynOffset, rootVar),
+		_VarPointsTo(storeDynOffset, rootVar),
+		// offsetVar
+		_AssignVar(_, loadDynOffsetRoot, offsetVar),
+		_SimpleAssign(_, offsetVar, offset),
+		//hacky way to limit the size of integer
+		strlen(offset) < 5,
+		// offsetVar + loadOffset
+		storeOffset = to_number(offset) + loadOffset,
+		// a = load(b)
+		// b = load(a)
+		n > 0.
+
+
+	// storeAddress($x + 10)
+	// $y = $x
+	// loadAddress($y + 10)
+
+	/* load by direct match offset, 
+	TODO: needs double check for the correctness */
+	// LoadDataAddress(insn, to, storedAddress, n - 1, data):-
+	// 	StoreDataAddress(_, storeDynOffset, offset, storedAddress, n, data),
+	// 	_Load(insn, loadDynOffset, offset, to),
+	// 	// loadDynOffset
+	// 	_VarPointsTo(loadDynOffset, rootVar),
+	// 	_VarPointsTo(storeDynOffset, rootVar),
+	// 	n > 0.
+
+
+	/* Load data by either directly or adding certain offset*/
+	.decl LoadData(insn: Insn, to: Var, from: Var)
+
+	// pass as copy assignment
+	LoadData(insn, to, from):-
+		FirstLoadData(insn, to, from).
+
+	// load data by directly mataching offset
+	LoadData(insn, to, from):-
+		StoreData(_, storeDynOffset, offset, from),
+		_Load(insn, loadDynOffset, offset, to),
+		_VarPointsTo(storeDynOffset, address),
+		_VarPointsTo(loadDynOffset, address).
+
+
+	// Store(storeDynOffset + storeOffset) = from
+	// loadAddressVar = loadDynOffset + loadOffsetVar
+	// to = Load(loadAddressVar + loadOffset) 
+	// ---> loadOffsetVar + loadOffset = storeOffset
+
+	// load data by computing the offset 
+	LoadData(insn, to, from):-
+		StoreData(_, storeDynOffset, storeOffset, from),
+		_Load(insn, loadAddressVar, loadOffset, to),
+		_VarPointsTo(loadAddressVar, loadAddress),
+		// loadAddress <- dynOffset
+		_AssignVar(_, loadAddress, loadDynOffset),
+		_VarPointsTo(loadDynOffset, dynOffset),
+		_VarPointsTo(storeDynOffset, dynOffset),
+		// loadAddress <- loadOffsetVar
+		_AssignVar(_, loadAddress, loadOffsetVar),
+		_SimpleAssign(_, loadOffsetVar, num),
+		//hacky way to limit the size of integer
+		strlen(num) < 5,
+		storeOffset = to_number(num) + loadOffset.
+
+	// load using loaded address
+	LoadData(insn, to, data):-
+		LoadDataAddress(_, address, _, 0, data),
+		_Load(insn, address, 0, to).
+
+
+	/*******************
+	** VarPointsTo_v2 **
+	********************/
+
+	// load data/address, 
+	// pass as copy assignment 
+	// recursive because loadData uses IntraCopyAssign
+	RootVar(from),
+	IntraCopyAssign(insn, to, from):-
+		LoadData(insn, to, from);
+		LoadDataAddress(insn, to, from, _, _).
+
+
+	/* the complete set of vriable assignments */
+	.decl InterCopyAssign(to: Var, from: Var)
+
+	// the load for other variables uses a crude method
+	// copy assignment from dynOffset
+	// to = load(from)
+	InterCopyAssign(to, from):-
+		_Load(_, from, _, to),
+		!LoadData(_, to, _),
+		!LoadDataAddress(_, to, _, _, _).
+
+	// for the other vars, copy the data to the root var
+	InterCopyAssign(var, from):-
+		_Store(insn, to, _, from),
+		_VarPointsTo(to, var),
+		!StoreData(insn, _, _, _),
+		!StoreDataAddress(insn, _, _, _, _, _).
+
+	// inherit the v1 relation
+	InterCopyAssign(to, from):-
+		_InterCopyAssign(to, from).
+
+	/* VarPointsTo_v2 set including store/load mapping for certain variables */
+	.decl VarPointsTo(var1: Var, var2: Var)
+
+	// inherit the v1 relation
+	VarPointsTo(var, to):-
+		_VarPointsTo(var, to).
+
+	// v2 addition
+	VarPointsTo(var, to):-
+		VarPointsTo(from, to),
+		InterCopyAssign(var, from).
 
 }
